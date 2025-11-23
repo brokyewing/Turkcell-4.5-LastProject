@@ -1,7 +1,5 @@
 # LibraryApp-Last - Microservices Architecture
 
-Bu proje, LibraryApp'in microservices mimarisine dönüştürülmüş versiyonudur. Tüm işlevsellik LibraryApp'teki gibi korunmuş, ancak mimari olarak microservices pattern'i kullanılmıştır.
-
 ## Proje Yapısı
 
 ```
