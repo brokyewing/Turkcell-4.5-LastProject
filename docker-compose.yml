@@ -74,6 +74,22 @@ services:
       retries: 3
       start_period: 40s
 
+  config-server:
+    build:
+      context: .
+      dockerfile: ./config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    depends_on:
+      - discovery-server
+    networks:
+      - library-network
+    environment:
+      - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+    volumes:
+      - ./configurations:/app/configurations
+
   gateway-server:
     build: ./gateway-server
     container_name: gateway-server
