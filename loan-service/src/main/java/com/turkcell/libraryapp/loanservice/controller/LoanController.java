@@ -7,7 +7,7 @@ import com.turkcell.libraryapp.loanservice.entity.Loan;
 import com.turkcell.libraryapp.loanservice.exception.BusinessException;
 import com.turkcell.libraryapp.loanservice.service.LoanService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +17,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/loans")
+@RequiredArgsConstructor
 public class LoanController {
 
-    @Autowired
-    private LoanService loanService;
+    private final LoanService loanService;
 
     @PostMapping
     public ResponseEntity<LoanResponseDto> createLoan(@Valid @RequestBody LoanCreateRequest request) {
@@ -77,6 +77,12 @@ public class LoanController {
         Loan loan = loanService.getLoanById(id);
         LoanResponseDto response = mapToDto(loan);
         return ResponseEntity.ok(response);
+    }
+
+    // Servisler arası varlık kontrolü için: 200 + true/false döner (fine-service Feign ile çağırır).
+    @GetMapping("/{id}/exists")
+    public Boolean existsById(@PathVariable Long id) {
+        return loanService.existsById(id);
     }
     
     @GetMapping

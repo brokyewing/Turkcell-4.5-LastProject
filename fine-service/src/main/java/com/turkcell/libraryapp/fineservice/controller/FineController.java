@@ -2,7 +2,7 @@ package com.turkcell.libraryapp.fineservice.controller;
 
 import com.turkcell.libraryapp.fineservice.entity.Fine;
 import com.turkcell.libraryapp.fineservice.service.FineService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -11,10 +11,10 @@ import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/fines")
+@RequiredArgsConstructor
 public class FineController {
 
-    @Autowired
-    private FineService fineService;
+    private final FineService fineService;
 
     @GetMapping
     public ResponseEntity<List<Fine>> getAllFines(
@@ -71,6 +71,10 @@ public class FineController {
         return ResponseEntity.ok().build();
     }
 }
+
+
+
+
 
 
 

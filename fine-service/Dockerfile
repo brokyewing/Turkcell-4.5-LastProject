@@ -11,3 +11,7 @@ EXPOSE 8085
 ENTRYPOINT ["java", "-jar", "app.jar"]
 
 
+
+
+
+

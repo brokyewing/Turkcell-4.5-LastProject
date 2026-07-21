@@ -1,0 +1,38 @@
+name: CI
+
+# Her push ve PR'da tüm servisleri derle + test et.
+# (Bu depo GitHub'a itildiğinde otomatik çalışır.)
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service:
+          - discovery-server
+          - gateway-server
+          - book-service
+          - member-service
+          - loan-service
+          - fine-service
+          - reservation-service
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: JDK 21 kur
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      # Docker, ubuntu-latest runner'ında hazır — book-service'in Testcontainers
+      # testi gerçek PostgreSQL container'ını burada başlatabilir.
+      - name: ${{ matrix.service }} derle + test
+        working-directory: ${{ matrix.service }}
+        run: mvn -B verify

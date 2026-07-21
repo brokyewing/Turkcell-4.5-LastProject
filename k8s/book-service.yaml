@@ -1,0 +1,63 @@
+# book-service için Kubernetes manifest'i (Deployment + Service).
+# Aynı desen diğer 4 iş servisi için tekrarlanır; postgres/redis/kafka
+# ya benzer Deployment'larla ya da yönetilen (managed) servislerle sağlanır.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-service
+  labels:
+    app: book-service
+spec:
+  # K8s bu servisin 2 kopyasını ayakta tutar: yükü dağıtır, biri çökerse
+  # yenisini başlatır, sürüm güncellemesini kesintisiz (rolling) yapar.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: book-service
+  template:
+    metadata:
+      labels:
+        app: book-service
+    spec:
+      containers:
+        - name: book-service
+          image: kitaplik/book-service:latest   # kendi registry'ne push edilmiş imaj
+          ports:
+            - containerPort: 8081
+          env:
+            - name: SPRING_DATASOURCE_URL
+              value: jdbc:postgresql://postgres:5432/library_db
+            - name: SPRING_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: username }
+            - name: SPRING_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef: { name: db-credentials, key: password }
+            - name: SPRING_DATA_REDIS_HOST
+              value: redis
+            - name: EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE
+              value: http://discovery-server:8761/eureka/
+          # GERÇEK healthcheck: K8s doğrudan HTTP GET atar (container'da curl gerekmez).
+          # docker-compose'daki sahte "exit 0" yerine doğrusu budur.
+          readinessProbe:                 # hazır olmadan trafik gönderme
+            httpGet: { path: /actuator/health, port: 8081 }
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          livenessProbe:                  # takılırsa yeniden başlat
+            httpGet: { path: /actuator/health, port: 8081 }
+            initialDelaySeconds: 45
+            periodSeconds: 15
+          resources:
+            requests: { cpu: 250m, memory: 512Mi }
+            limits:   { cpu: "1",  memory: 1Gi }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-service      # diğer servisler bu isimle erişir (K8s DNS)
+spec:
+  selector:
+    app: book-service
+  ports:
+    - port: 8081
+      targetPort: 8081

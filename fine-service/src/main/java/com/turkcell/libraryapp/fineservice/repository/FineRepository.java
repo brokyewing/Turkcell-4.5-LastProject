@@ -23,3 +23,7 @@ public interface FineRepository extends JpaRepository<Fine, Long> {
 
 
 
+
+
+
+

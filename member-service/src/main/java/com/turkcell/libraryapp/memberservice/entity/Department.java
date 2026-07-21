@@ -9,10 +9,10 @@ public class Department {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "name", nullable = false)
     private String name;
-    
+
     @OneToMany(mappedBy = "department", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Student> students;
     
@@ -26,6 +26,10 @@ public class Department {
     public List<Student> getStudents() { return students; }
     public void setStudents(List<Student> students) { this.students = students; }
 }
+
+
+
+
 
 
 

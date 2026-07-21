@@ -4,17 +4,18 @@ import com.turkcell.libraryapp.bookservice.entity.Author;
 import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.repository.AuthorRepository;
 import com.turkcell.libraryapp.bookservice.service.AuthorService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class AuthorServiceImpl implements AuthorService {
 
-    @Autowired
-    private AuthorRepository authorRepository;
+    private final AuthorRepository authorRepository;
 
     @Override
     public List<Author> getAllAuthors() {
@@ -27,6 +28,7 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
+    @Transactional
     public Author createAuthor(Author author) {
         Optional<Author> existing = authorRepository.findByNameAndLastname(author.getName(), author.getLastname());
         if (existing.isPresent()) {
@@ -36,6 +38,7 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
+    @Transactional
     public Author updateAuthor(Long id, Author authorDetails) {
         Author existingAuthor = authorRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Author with id " + id + " not found"));
@@ -54,6 +57,7 @@ public class AuthorServiceImpl implements AuthorService {
     }
 
     @Override
+    @Transactional
     public void deleteAuthor(Long id) {
         if (!authorRepository.existsById(id)) {
             throw new BusinessException("Author with id " + id + " not found");
@@ -76,6 +80,10 @@ public class AuthorServiceImpl implements AuthorService {
         return authorRepository.findAuthorsWithMoreThanBooks(bookCount);
     }
 }
+
+
+
+
 
 
 

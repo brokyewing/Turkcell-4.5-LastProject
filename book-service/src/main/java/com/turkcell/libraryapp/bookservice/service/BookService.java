@@ -1,5 +1,6 @@
 package com.turkcell.libraryapp.bookservice.service;
 
+import com.turkcell.libraryapp.bookservice.dto.response.BookResponseDto;
 import com.turkcell.libraryapp.bookservice.entity.Book;
 import java.util.List;
 import java.util.Optional;
@@ -7,6 +8,7 @@ import java.util.Optional;
 public interface BookService {
     List<Book> getAllBooks();
     Optional<Book> getBookById(Long id);
+    BookResponseDto getBookDtoById(Long id);   // Redis ile cache'lenen okuma
     Book createBook(Book book);
     Book updateBook(Long id, Book bookDetails);
     void deleteBook(Long id);
@@ -18,6 +20,10 @@ public interface BookService {
     List<Book> findBooksByAuthor(String author);
     List<Book> findBooksWithAvailableCopies();
 }
+
+
+
+
 
 
 

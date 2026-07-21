@@ -7,25 +7,24 @@ import com.turkcell.libraryapp.reservationservice.enums.ReservationStatus;
 import com.turkcell.libraryapp.reservationservice.exception.BusinessException;
 import com.turkcell.libraryapp.reservationservice.repository.ReservationRepository;
 import com.turkcell.libraryapp.reservationservice.service.ReservationService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class ReservationServiceImpl implements ReservationService {
 
-    @Autowired
-    private ReservationRepository reservationRepository;
+    private final ReservationRepository reservationRepository;
     
-    @Autowired
-    private MemberServiceClient memberServiceClient;
+    private final MemberServiceClient memberServiceClient;
     
-    @Autowired
-    private BookServiceClient bookServiceClient;
+    private final BookServiceClient bookServiceClient;
 
     @Override
     public List<Reservation> getAllReservations() {
@@ -38,27 +37,11 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional
     public Reservation createReservation(Reservation reservation) {
-        // Validate student exists
-        try {
-            ResponseEntity<?> studentResponse = memberServiceClient.getStudentById(reservation.getStudentId());
-            if (studentResponse.getStatusCode().is4xxClientError() || !studentResponse.hasBody()) {
-                throw new BusinessException("Student not found with id: " + reservation.getStudentId());
-            }
-        } catch (Exception e) {
-            throw new BusinessException("Student not found with id: " + reservation.getStudentId());
-        }
-        
-        // Validate copy book exists
-        try {
-            ResponseEntity<?> copyBookResponse = bookServiceClient.getCopyBookById(reservation.getCopyBookId());
-            if (copyBookResponse.getStatusCode().is4xxClientError() || !copyBookResponse.hasBody()) {
-                throw new BusinessException("CopyBook not found with id: " + reservation.getCopyBookId());
-            }
-        } catch (Exception e) {
-            throw new BusinessException("CopyBook not found with id: " + reservation.getCopyBookId());
-        }
-        
+        ensureStudentExists(reservation.getStudentId());
+        ensureCopyBookExists(reservation.getCopyBookId());
+
         if (reservation.getReservationDate() == null) {
             reservation.setReservationDate(LocalDateTime.now());
         }
@@ -68,7 +51,34 @@ public class ReservationServiceImpl implements ReservationService {
         return reservationRepository.save(reservation);
     }
 
+    private void ensureStudentExists(Long studentId) {
+        boolean exists;
+        try {
+            exists = Boolean.TRUE.equals(memberServiceClient.existsById(studentId));
+        } catch (FeignException e) {
+            throw new BusinessException(
+                    "member-service'e ulaşılamadı, öğrenci doğrulanamadı (HTTP " + e.status() + ")");
+        }
+        if (!exists) {
+            throw new BusinessException("Student not found with id: " + studentId);
+        }
+    }
+
+    private void ensureCopyBookExists(Long copyBookId) {
+        boolean exists;
+        try {
+            exists = Boolean.TRUE.equals(bookServiceClient.existsById(copyBookId));
+        } catch (FeignException e) {
+            throw new BusinessException(
+                    "book-service'e ulaşılamadı, kitap kopyası doğrulanamadı (HTTP " + e.status() + ")");
+        }
+        if (!exists) {
+            throw new BusinessException("CopyBook not found with id: " + copyBookId);
+        }
+    }
+
     @Override
+    @Transactional
     public Reservation updateReservation(Long id, Reservation reservationDetails) {
         Reservation existing = reservationRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Reservation not found with id: " + id));
@@ -79,6 +89,7 @@ public class ReservationServiceImpl implements ReservationService {
     }
 
     @Override
+    @Transactional
     public void deleteReservation(Long id) {
         if (!reservationRepository.existsById(id)) {
             throw new BusinessException("Reservation not found with id: " + id);

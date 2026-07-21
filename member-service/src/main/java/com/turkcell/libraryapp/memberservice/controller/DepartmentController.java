@@ -1,41 +1,43 @@
 package com.turkcell.libraryapp.memberservice.controller;
 
+import com.turkcell.libraryapp.memberservice.dto.DepartmentResponseDto;
 import com.turkcell.libraryapp.memberservice.entity.Department;
 import com.turkcell.libraryapp.memberservice.service.DepartmentService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/departments")
+@RequiredArgsConstructor
 public class DepartmentController {
-    @Autowired
-    private DepartmentService departmentService;
+    private final DepartmentService departmentService;
 
     @GetMapping
-    public List<Department> getAllDepartments() {
-        return departmentService.getAllDepartments();
+    public List<DepartmentResponseDto> getAllDepartments() {
+        return departmentService.getAllDepartments().stream()
+                .map(DepartmentResponseDto::from)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Department> getDepartmentById(@PathVariable Long id) {
-        Optional<Department> dept = departmentService.getDepartmentById(id);
-        return dept.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<DepartmentResponseDto> getDepartmentById(@PathVariable Long id) {
+        return departmentService.getDepartmentById(id)
+                .map(d -> ResponseEntity.ok(DepartmentResponseDto.from(d)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Department> addDepartment(@RequestBody Department department) {
-        Department created = departmentService.createDepartment(department);
-        return ResponseEntity.ok(created);
+    public DepartmentResponseDto addDepartment(@RequestBody Department department) {
+        return DepartmentResponseDto.from(departmentService.createDepartment(department));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Department> updateDepartment(@PathVariable Long id, @RequestBody Department department) {
-        Department updated = departmentService.updateDepartment(id, department);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<DepartmentResponseDto> updateDepartment(@PathVariable Long id, @RequestBody Department department) {
+        return ResponseEntity.ok(DepartmentResponseDto.from(departmentService.updateDepartment(id, department)));
     }
 
     @DeleteMapping("/{id}")
@@ -44,6 +46,3 @@ public class DepartmentController {
         return ResponseEntity.ok().build();
     }
 }
-
-
-

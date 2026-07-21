@@ -18,7 +18,7 @@ spring:
         - id: member-service
           uri: lb://member-service
           predicates:
-            - Path=/api/members/**,/api/students/**,/api/departments/**
+            - Path=/api/members/**,/api/students/**,/api/departments/**,/api/auth/**
         - id: reservation-service
           uri: lb://reservation-service
           predicates:
@@ -31,6 +31,9 @@ spring:
         locator:
           enabled: true
           lower-case-service-id: true
+
+jwt:
+  secret: ${JWT_SECRET:library-app-super-secret-key-change-in-production-please-256bit!!}
 
 eureka:
   client:

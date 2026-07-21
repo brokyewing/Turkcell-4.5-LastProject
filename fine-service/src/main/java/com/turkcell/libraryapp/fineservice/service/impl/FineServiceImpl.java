@@ -6,25 +6,24 @@ import com.turkcell.libraryapp.fineservice.entity.Fine;
 import com.turkcell.libraryapp.fineservice.exception.BusinessException;
 import com.turkcell.libraryapp.fineservice.repository.FineRepository;
 import com.turkcell.libraryapp.fineservice.service.FineService;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.ResponseEntity;
+import feign.FeignException;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class FineServiceImpl implements FineService {
 
-    @Autowired
-    private FineRepository fineRepository;
+    private final FineRepository fineRepository;
     
-    @Autowired
-    private MemberServiceClient memberServiceClient;
+    private final MemberServiceClient memberServiceClient;
     
-    @Autowired
-    private LoanServiceClient loanServiceClient;
+    private final LoanServiceClient loanServiceClient;
 
     @Override
     public List<Fine> getAllFines() {
@@ -37,34 +36,45 @@ public class FineServiceImpl implements FineService {
     }
 
     @Override
+    @Transactional
     public Fine createFine(Fine fine) {
-        // Validate student exists
-        try {
-            ResponseEntity<?> studentResponse = memberServiceClient.getStudentById(fine.getStudentId());
-            if (studentResponse.getStatusCode().is4xxClientError() || !studentResponse.hasBody()) {
-                throw new BusinessException("Student not found with id: " + fine.getStudentId());
-            }
-        } catch (Exception e) {
-            throw new BusinessException("Student not found with id: " + fine.getStudentId());
-        }
-        
-        // Validate loan exists
-        try {
-            ResponseEntity<?> loanResponse = loanServiceClient.getLoanById(fine.getLoanId());
-            if (loanResponse.getStatusCode().is4xxClientError() || !loanResponse.hasBody()) {
-                throw new BusinessException("Loan not found with id: " + fine.getLoanId());
-            }
-        } catch (Exception e) {
-            throw new BusinessException("Loan not found with id: " + fine.getLoanId());
-        }
-        
+        ensureStudentExists(fine.getStudentId());
+        ensureLoanExists(fine.getLoanId());
+
         if (fine.getCreatedDate() == null) {
             fine.setCreatedDate(LocalDateTime.now());
         }
         return fineRepository.save(fine);
     }
 
+    private void ensureStudentExists(Long studentId) {
+        boolean exists;
+        try {
+            exists = Boolean.TRUE.equals(memberServiceClient.existsById(studentId));
+        } catch (FeignException e) {
+            throw new BusinessException(
+                    "member-service'e ulaşılamadı, öğrenci doğrulanamadı (HTTP " + e.status() + ")");
+        }
+        if (!exists) {
+            throw new BusinessException("Student not found with id: " + studentId);
+        }
+    }
+
+    private void ensureLoanExists(Long loanId) {
+        boolean exists;
+        try {
+            exists = Boolean.TRUE.equals(loanServiceClient.existsById(loanId));
+        } catch (FeignException e) {
+            throw new BusinessException(
+                    "loan-service'e ulaşılamadı, ödünç doğrulanamadı (HTTP " + e.status() + ")");
+        }
+        if (!exists) {
+            throw new BusinessException("Loan not found with id: " + loanId);
+        }
+    }
+
     @Override
+    @Transactional
     public Fine updateFine(Long id, Fine fineDetails) {
         Fine existing = fineRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Fine not found with id: " + id));
@@ -77,6 +87,7 @@ public class FineServiceImpl implements FineService {
     }
 
     @Override
+    @Transactional
     public void deleteFine(Long id) {
         if (!fineRepository.existsById(id)) {
             throw new BusinessException("Fine not found with id: " + id);

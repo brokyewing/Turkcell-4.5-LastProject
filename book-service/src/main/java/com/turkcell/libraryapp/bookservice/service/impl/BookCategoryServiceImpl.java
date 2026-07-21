@@ -4,17 +4,18 @@ import com.turkcell.libraryapp.bookservice.entity.BookCategory;
 import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.repository.BookCategoryRepository;
 import com.turkcell.libraryapp.bookservice.service.BookCategoryService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class BookCategoryServiceImpl implements BookCategoryService {
 
-    @Autowired
-    private BookCategoryRepository categoryRepository;
+    private final BookCategoryRepository categoryRepository;
 
     @Override
     public List<BookCategory> getAllCategories() {
@@ -27,11 +28,13 @@ public class BookCategoryServiceImpl implements BookCategoryService {
     }
 
     @Override
+    @Transactional
     public BookCategory createCategory(BookCategory category) {
         return categoryRepository.save(category);
     }
 
     @Override
+    @Transactional
     public BookCategory updateCategory(Long id, BookCategory categoryDetails) {
         BookCategory existingCategory = categoryRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Category with id " + id + " not found"));
@@ -40,6 +43,7 @@ public class BookCategoryServiceImpl implements BookCategoryService {
     }
 
     @Override
+    @Transactional
     public void deleteCategory(Long id) {
         if (!categoryRepository.existsById(id)) {
             throw new BusinessException("Category with id " + id + " not found");

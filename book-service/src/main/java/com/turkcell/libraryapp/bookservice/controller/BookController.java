@@ -8,7 +8,7 @@ import com.turkcell.libraryapp.bookservice.service.AuthorService;
 import com.turkcell.libraryapp.bookservice.service.BookCategoryService;
 import com.turkcell.libraryapp.bookservice.service.BookService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,16 +18,14 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/books")
+@RequiredArgsConstructor
 public class BookController {
 
-    @Autowired
-    private BookService bookService;
+    private final BookService bookService;
     
-    @Autowired
-    private AuthorService authorService;
+    private final AuthorService authorService;
     
-    @Autowired
-    private BookCategoryService categoryService;
+    private final BookCategoryService categoryService;
 
     @PostMapping
     public ResponseEntity<BookResponseDto> createBook(@Valid @RequestBody BookCreateRequest request) {
@@ -101,9 +99,8 @@ public class BookController {
 
     @GetMapping("/{id}")
     public ResponseEntity<BookResponseDto> getBookById(@PathVariable Long id) {
-        Optional<Book> book = bookService.getBookById(id);
-        return book.map(b -> ResponseEntity.ok(mapToDto(b)))
-                  .orElse(ResponseEntity.notFound().build());
+        // Redis ile cache'lenmiş okuma: ilk çağrı DB'ye gider, sonrakiler cache'ten döner.
+        return ResponseEntity.ok(bookService.getBookDtoById(id));
     }
     
     private BookResponseDto mapToDto(Book book) {
@@ -120,6 +117,10 @@ public class BookController {
         return dto;
     }
 }
+
+
+
+
 
 
 

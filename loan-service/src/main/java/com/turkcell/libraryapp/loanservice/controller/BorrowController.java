@@ -3,7 +3,7 @@ package com.turkcell.libraryapp.loanservice.controller;
 import com.turkcell.libraryapp.loanservice.dto.response.LoanResponseDto;
 import com.turkcell.libraryapp.loanservice.entity.Loan;
 import com.turkcell.libraryapp.loanservice.service.LoanService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -12,10 +12,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/borrow")
+@RequiredArgsConstructor
 public class BorrowController {
 
-    @Autowired
-    private LoanService loanService;
+    private final LoanService loanService;
 
     @GetMapping("/me/{studentId}")
     public List<LoanResponseDto> getMyLoans(@PathVariable Long studentId) {
@@ -35,6 +35,10 @@ public class BorrowController {
                 .collect(java.util.stream.Collectors.toList());
     }
 }
+
+
+
+
 
 
 

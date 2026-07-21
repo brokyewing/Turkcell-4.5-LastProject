@@ -1,5 +1,6 @@
 package com.turkcell.libraryapp.memberservice.entity;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.turkcell.libraryapp.memberservice.enums.MembershipLevel;
 import jakarta.persistence.*;
 import java.util.List;
@@ -21,6 +22,9 @@ public class Student {
     @JoinColumn(name = "departmantid", nullable = false)
     private Department department;
     
+    // WRITE_ONLY: gelen JSON'dan OKUNUR (kayıt/giriş) ama yanıtta ASLA yazılmaz.
+    // Böylece parola dışarı sızmaz. (Üretimde ayrıca BCrypt ile hash'lenmeli.)
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "password", nullable = false)
     private String password;
     
@@ -59,6 +63,10 @@ public class Student {
     public MembershipLevel getMembershipLevel() { return membershipLevel; }
     public void setMembershipLevel(MembershipLevel membershipLevel) { this.membershipLevel = membershipLevel; }
 }
+
+
+
+
 
 
 

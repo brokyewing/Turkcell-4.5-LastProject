@@ -7,7 +7,7 @@ import com.turkcell.libraryapp.reservationservice.enums.ReservationStatus;
 import com.turkcell.libraryapp.reservationservice.exception.BusinessException;
 import com.turkcell.libraryapp.reservationservice.service.ReservationService;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,10 +17,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/reservations")
+@RequiredArgsConstructor
 public class ReservationController {
 
-    @Autowired
-    private ReservationService reservationService;
+    private final ReservationService reservationService;
 
     @PostMapping
     public ResponseEntity<ReservationResponseDto> createReservation(@Valid @RequestBody ReservationCreateRequest request) {
@@ -89,6 +89,10 @@ public class ReservationController {
         return dto;
     }
 }
+
+
+
+
 
 
 

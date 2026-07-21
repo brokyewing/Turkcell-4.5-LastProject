@@ -1,41 +1,45 @@
 package com.turkcell.libraryapp.bookservice.controller;
 
+import com.turkcell.libraryapp.bookservice.dto.response.CategoryResponseDto;
 import com.turkcell.libraryapp.bookservice.entity.BookCategory;
 import com.turkcell.libraryapp.bookservice.service.BookCategoryService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/categories")
+@RequiredArgsConstructor
 public class BookCategoryController {
 
-    @Autowired
-    private BookCategoryService categoryService;
+    private final BookCategoryService categoryService;
 
     @GetMapping
-    public List<BookCategory> getAllCategories() {
-        return categoryService.getAllCategories();
+    public List<CategoryResponseDto> getAllCategories() {
+        return categoryService.getAllCategories().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<BookCategory> getById(@PathVariable Long id) {
-        Optional<BookCategory> category = categoryService.getCategoryById(id);
-        return category.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<CategoryResponseDto> getById(@PathVariable Long id) {
+        return categoryService.getCategoryById(id)
+                .map(c -> ResponseEntity.ok(mapToDto(c)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public BookCategory add(@RequestBody BookCategory category) {
-        return categoryService.createCategory(category);
+    public CategoryResponseDto add(@RequestBody BookCategory category) {
+        return mapToDto(categoryService.createCategory(category));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<BookCategory> update(@PathVariable Long id, @RequestBody BookCategory categoryDetails) {
-        BookCategory updatedCategory = categoryService.updateCategory(id, categoryDetails);
-        return ResponseEntity.ok(updatedCategory);
+    public ResponseEntity<CategoryResponseDto> update(@PathVariable Long id, @RequestBody BookCategory categoryDetails) {
+        BookCategory updated = categoryService.updateCategory(id, categoryDetails);
+        return ResponseEntity.ok(mapToDto(updated));
     }
 
     @DeleteMapping("/{id}")
@@ -43,7 +47,9 @@ public class BookCategoryController {
         categoryService.deleteCategory(id);
         return ResponseEntity.ok().build();
     }
+
+    // Entity → DTO: sadece dışarıya açılacak alanlar. 'books' koleksiyonu dışarı çıkmaz.
+    private CategoryResponseDto mapToDto(BookCategory category) {
+        return new CategoryResponseDto(category.getId(), category.getName());
+    }
 }
-
-
-

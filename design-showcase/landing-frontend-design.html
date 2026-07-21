@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Okur · Kendi kütüphanen, kendi ritmin</title>
+<!-- frontend-design felsefesi:
+     Subject: okuma/kitap. Hero = tez. İmza öğe: sayfa bir kitabın "içindekiler" sayfası gibi kurgulanır
+     (Roman rakamı bölümler + hero'da manuscript drop-cap). Tek risk: dev editoryel pull-quote.
+     Klişelerden kaçış: serin kağıt (krem değil), Newsreader (Playfair/Fraunces değil), mürekkep-mavi accent (terracotta değil).
+     Boldness tek yerde: tipografi. Hareket ölçülü. -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --paper: #f3f2ec;        /* serin kağıt (krem klişesi #f4f1ea değil) */
+    --paper-2: #eeede6;
+    --ink: #1b1c1a;          /* mürekkep */
+    --muted: #6c6f68;
+    --accent: #24427a;       /* kütüphane mürekkep-mavisi (tek risk rengi, terracotta değil) */
+    --line: #d9d7cc;
+    --serif: 'Newsreader', Georgia, serif;
+    --sans: 'IBM Plex Sans', system-ui, sans-serif;
+    --maxw: 1120px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } * { animation: none !important; transition: none !important; } }
+  body { background: var(--paper); color: var(--ink); font-family: var(--serif); font-size: 19px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 34px; }
+  .kicker { font-family: var(--sans); font-size: 12px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); }
+  .btn { display: inline-flex; align-items: center; gap: 9px; font-family: var(--sans); font-weight: 600; font-size: 15px; padding: 13px 24px; border-radius: 4px; cursor: pointer; border: 1px solid var(--ink); background: var(--ink); color: var(--paper); transition: opacity .2s, transform .15s; }
+  .btn:hover { opacity: .86; transform: translateY(-1px); }
+  .btn.quiet { background: transparent; color: var(--ink); border-color: var(--line); }
+  .btn.quiet:hover { border-color: var(--ink); }
+  .btn i { font-size: 17px; }
+
+  /* İmza: içindekiler numarası (roman rakamı) — okuma yolculuğu bir sıradır */
+  .idx { font-family: var(--sans); font-size: 13px; letter-spacing: .1em; color: var(--accent); font-weight: 600; }
+
+  /* Nav: tek satır, ince, editoryel */
+  nav { border-bottom: 1px solid var(--line); position: sticky; top: 0; background: rgba(243,242,236,.85); backdrop-filter: blur(8px); z-index: 40; }
+  nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 66px; }
+  .brand { font-family: var(--serif); font-weight: 600; font-size: 24px; letter-spacing: -.01em; }
+  .brand em { font-style: italic; color: var(--accent); }
+  .nl { display: flex; align-items: center; gap: 30px; font-family: var(--sans); }
+  .nl a.l { color: var(--muted); font-size: 14px; font-weight: 500; }
+  .nl a.l:hover { color: var(--ink); }
+  @media (max-width: 780px) { .nl .l { display: none; } }
+
+  /* Hero = tez. İmza: manuscript drop-cap. Boldness tipografide. */
+  .hero { padding: 86px 0 74px; border-bottom: 1px solid var(--line); }
+  .hero .grid { display: grid; grid-template-columns: 1fr; gap: 8px; max-width: 940px; }
+  .hero h1 { font-weight: 400; font-size: clamp(46px, 8vw, 104px); line-height: .96; letter-spacing: -.03em; margin: 20px 0 26px; }
+  .hero h1 em { font-style: italic; }
+  .hero .sub { display: flex; gap: 22px; align-items: flex-start; max-width: 660px; }
+  .hero .drop { font-size: 92px; line-height: .7; font-weight: 500; color: var(--accent); font-style: italic; }
+  .hero .sub p { color: var(--muted); font-size: 21px; padding-top: 6px; }
+  .hero .row { display: flex; gap: 14px; margin-top: 38px; align-items: center; }
+  .hero .meta { font-family: var(--sans); font-size: 13px; color: var(--muted); }
+
+  /* İçindekiler şeridi (imzayı pekiştirir) */
+  .contents { border-bottom: 1px solid var(--line); background: rgba(0,0,0,.015); }
+  .contents .wrap { display: flex; gap: 40px; padding: 20px 34px; flex-wrap: wrap; font-family: var(--sans); font-size: 13px; }
+  .contents a { color: var(--muted); display: flex; gap: 8px; }
+  .contents a:hover { color: var(--accent); }
+  .contents a b { color: var(--accent); }
+
+  section { padding: 92px 0; border-bottom: 1px solid var(--line); }
+  .sec-top { display: flex; align-items: baseline; gap: 18px; margin-bottom: 44px; }
+  .sec-top h2 { font-weight: 400; font-size: clamp(30px, 4.5vw, 52px); letter-spacing: -.02em; }
+  .sec-top h2 em { font-style: italic; color: var(--accent); }
+
+  /* Özellikler: editoryel iki sütun, kart yok (border ile grupla) */
+  .rows { display: flex; flex-direction: column; }
+  .frow { display: grid; grid-template-columns: 80px 1fr 1.1fr; gap: 28px; padding: 34px 0; border-top: 1px solid var(--line); align-items: start; }
+  .frow:last-child { border-bottom: 1px solid var(--line); }
+  @media (max-width: 760px) { .frow { grid-template-columns: 1fr; gap: 10px; } }
+  .frow .no { font-family: var(--sans); font-size: 13px; color: var(--accent); font-weight: 600; padding-top: 8px; }
+  .frow h3 { font-weight: 500; font-size: 30px; letter-spacing: -.01em; }
+  .frow p { color: var(--muted); font-size: 18px; }
+
+  /* Tek risk: dev editoryel pull-quote (manuscript) */
+  .pull { padding: 104px 0; text-align: center; }
+  .pull blockquote { max-width: 900px; margin: 0 auto; font-weight: 400; font-size: clamp(30px, 5vw, 58px); line-height: 1.14; letter-spacing: -.02em; font-style: italic; }
+  .pull blockquote b { font-style: normal; font-weight: 600; color: var(--accent); }
+  .pull cite { display: block; font-family: var(--sans); font-style: normal; font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); margin-top: 30px; }
+
+  /* Nasıl okursun: gerçek sıra */
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; }
+  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
+  .stp { padding: 8px 30px 8px 0; border-left: 1px solid var(--line); padding-left: 26px; }
+  .stp:first-child { border-left: none; padding-left: 0; }
+  @media (max-width: 760px) { .stp { border-left: none; padding-left: 0; border-top: 1px solid var(--line); padding-top: 24px; margin-top: 24px; } .stp:first-child { border-top: none; margin-top: 0; } }
+  .stp .rn { font-family: var(--serif); font-style: italic; font-size: 34px; color: var(--accent); }
+  .stp h4 { font-weight: 500; font-size: 24px; margin: 12px 0 8px; }
+  .stp p { color: var(--muted); font-size: 17px; }
+
+  /* Fiyatlar */
+  .plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; border: 1px solid var(--line); }
+  @media (max-width: 760px) { .plans { grid-template-columns: 1fr; } }
+  .plan { padding: 34px 30px; border-left: 1px solid var(--line); display: flex; flex-direction: column; }
+  .plan:first-child { border-left: none; }
+  @media (max-width: 760px) { .plan { border-left: none; border-top: 1px solid var(--line); } .plan:first-child { border-top: none; } }
+  .plan.pop { background: var(--ink); color: var(--paper); }
+  .plan .pn { font-family: var(--sans); font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .plan.pop .pn { color: #b9c2d6; }
+  .plan .amt { font-size: 50px; margin: 12px 0 2px; letter-spacing: -.02em; }
+  .plan .amt small { font-family: var(--sans); font-size: 15px; color: var(--muted); }
+  .plan.pop .amt small { color: #b9c2d6; }
+  .plan ul { list-style: none; font-family: var(--sans); font-size: 15px; margin: 22px 0 26px; display: flex; flex-direction: column; gap: 11px; }
+  .plan li { display: flex; gap: 10px; align-items: center; }
+  .plan li i { color: var(--accent); font-size: 17px; }
+  .plan.pop li i { color: #8fb0f0; }
+  .plan .btn { margin-top: auto; justify-content: center; }
+  .plan.pop .btn { background: var(--paper); color: var(--ink); border-color: var(--paper); }
+
+  .closing { text-align: center; border-bottom: none; }
+  .closing h2 { font-weight: 400; font-size: clamp(40px, 7vw, 88px); line-height: 1; letter-spacing: -.03em; margin-bottom: 22px; }
+  .closing h2 em { font-style: italic; color: var(--accent); }
+  .closing p { color: var(--muted); margin-bottom: 30px; }
+
+  footer { padding: 40px 0; }
+  footer .wrap { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; font-family: var(--sans); font-size: 13px; color: var(--muted); }
+
+  .fade { opacity: 0; transform: translateY(16px); animation: fade .7s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes fade { to { opacity: 1; transform: none; } }
+  .f2 { animation-delay: .1s } .f3 { animation-delay: .2s } .f4 { animation-delay: .3s }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <div class="brand">Ok<em>u</em>r</div>
+    <div class="nl">
+      <a class="l" href="#feats">Ne sunar</a>
+      <a class="l" href="#how">Nasıl okursun</a>
+      <a class="l" href="#pricing">Üyelik</a>
+      <a class="btn" href="#">Ücretsiz dene</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="grid">
+      <div class="kicker fade">Kişisel dijital kütüphane</div>
+      <h1 class="fade f2">Her okurun<br><em>kendi</em> ritmi vardır.</h1>
+      <div class="sub fade f3">
+        <span class="drop">O</span>
+        <p>kumak bir yarış değil. Kaldığın yeri hatırlayan, sana kitap değil doğru kitabı getiren bir kütüphane.</p>
+      </div>
+      <div class="row fade f4">
+        <a class="btn" href="#">Ücretsiz dene</a>
+        <a class="btn quiet" href="#how">Nasıl çalışır</a>
+        <span class="meta">Kredi kartı gerekmez</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="contents">
+  <div class="wrap">
+    <a href="#feats"><b>I.</b> Ne sunar</a>
+    <a href="#quote"><b>II.</b> Bir okurun sözü</a>
+    <a href="#how"><b>III.</b> Nasıl okursun</a>
+    <a href="#pricing"><b>IV.</b> Üyelik</a>
+  </div>
+</div>
+
+<section id="feats">
+  <div class="wrap">
+    <div class="sec-top"><span class="idx">I.</span><h2>Aradan çekilen <em>bir tasarım</em></h2></div>
+    <div class="rows">
+      <div class="frow">
+        <div class="no">01</div>
+        <h3>Ruh haline göre öneri</h3>
+        <p>Bu akşam ağır bir roman mı, kısa bir öykü mü? Okur seni zamanla tanır ve doğru kitabı önüne koyar. Ne okuyacağına karar vermek artık dakikalar sürmez.</p>
+      </div>
+      <div class="frow">
+        <div class="no">02</div>
+        <h3>Kaldığın satır</h3>
+        <p>Telefonda başla, tablette sürdür, akşam yine telefonda bitir. Kütüphanen her cihazda aynı satırdan açılır.</p>
+      </div>
+      <div class="frow">
+        <div class="no">03</div>
+        <h3>Sessiz okuma odası</h3>
+        <p>Reklam yok, bildirim yok, dikkat dağıtan hiçbir şey yok. Yalnızca sen, sayfa ve gecenin sessizliği.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="pull" id="quote">
+  <div class="wrap">
+    <div class="idx" style="margin-bottom:24px">II.</div>
+    <blockquote>"Doğru kitap, doğru gece bulununca; insan okumayı yeniden <b>hatırlar</b>."</blockquote>
+    <cite>Bir Okur üyesi</cite>
+  </div>
+</div>
+
+<section id="how">
+  <div class="wrap">
+    <div class="sec-top"><span class="idx">III.</span><h2>Üç adımda <em>başla</em></h2></div>
+    <div class="steps">
+      <div class="stp"><div class="rn">i</div><h4>Kaydol</h4><p>Saniyeler içinde, kredi kartsız. Sevdiğin türleri işaretle.</p></div>
+      <div class="stp"><div class="rn">ii</div><h4>Kitabını bul</h4><p>Öneri ve arama seni bu akşamın kitabına götürür.</p></div>
+      <div class="stp"><div class="rn">iii</div><h4>Oku</h4><p>Kaldığın satır seni bekler. Gerisi sana kalmış.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="pricing">
+  <div class="wrap">
+    <div class="sec-top"><span class="idx">IV.</span><h2>Sana uygun <em>bir üyelik</em></h2></div>
+    <div class="plans">
+      <div class="plan">
+        <div class="pn">Okur</div>
+        <div class="amt">₺0<small>/ay</small></div>
+        <ul>
+          <li><i class="ph ph-check"></i> Ayda 5 kitap</li>
+          <li><i class="ph ph-check"></i> Kaldığın satır</li>
+          <li><i class="ph ph-check"></i> Temel öneriler</li>
+        </ul>
+        <a class="btn quiet" href="#">Başla</a>
+      </div>
+      <div class="plan pop">
+        <div class="pn">Sınırsız</div>
+        <div class="amt">₺79<small>/ay</small></div>
+        <ul>
+          <li><i class="ph ph-check"></i> Sınırsız kitap</li>
+          <li><i class="ph ph-check"></i> Çevrimdışı okuma</li>
+          <li><i class="ph ph-check"></i> Ruh haline göre öneri</li>
+          <li><i class="ph ph-check"></i> Sessiz okuma odası</li>
+        </ul>
+        <a class="btn" href="#">Sınırsıza geç</a>
+      </div>
+      <div class="plan">
+        <div class="pn">Aile</div>
+        <div class="amt">₺129<small>/ay</small></div>
+        <ul>
+          <li><i class="ph ph-check"></i> 5 okur</li>
+          <li><i class="ph ph-check"></i> Ortak raflar</li>
+          <li><i class="ph ph-check"></i> Çocuk profili</li>
+        </ul>
+        <a class="btn quiet" href="#">Aileyi kur</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap">
+    <h2>İlk sayfa <em>seni bekliyor</em>.</h2>
+    <p>Ücretsiz başla, istediğin zaman bırak.</p>
+    <a class="btn" href="#">Ücretsiz dene</a>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <div class="brand" style="font-size:20px">Ok<em>u</em>r</div>
+    <div>© 2026 Okur · frontend-design felsefesiyle tasarlandı</div>
+  </div>
+</footer>
+
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+</body>
+</html>

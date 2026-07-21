@@ -1,30 +1,34 @@
 package com.turkcell.libraryapp.bookservice.controller;
 
+import com.turkcell.libraryapp.bookservice.dto.response.CopyBookResponseDto;
 import com.turkcell.libraryapp.bookservice.entity.CopyBook;
 import com.turkcell.libraryapp.bookservice.service.CopyBookService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/copybooks")
+@RequiredArgsConstructor
 public class CopyBookController {
 
-    @Autowired
-    private CopyBookService copyBookService;
+    private final CopyBookService copyBookService;
 
     @GetMapping
-    public List<CopyBook> getAllCopyBooks() {
-        return copyBookService.getAllCopyBooks();
+    public List<CopyBookResponseDto> getAllCopyBooks() {
+        return copyBookService.getAllCopyBooks().stream()
+                .map(this::mapToDto)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CopyBook> getCopyBookById(@PathVariable Long id) {
-        Optional<CopyBook> copyBook = copyBookService.getCopyBookById(id);
-        return copyBook.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<CopyBookResponseDto> getCopyBookById(@PathVariable Long id) {
+        return copyBookService.getCopyBookById(id)
+                .map(c -> ResponseEntity.ok(mapToDto(c)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}/exists")
@@ -38,9 +42,9 @@ public class CopyBookController {
     }
 
     @PostMapping
-    public ResponseEntity<CopyBook> createCopyBook(@RequestBody CopyBook copyBook) {
+    public ResponseEntity<CopyBookResponseDto> createCopyBook(@RequestBody CopyBook copyBook) {
         CopyBook created = copyBookService.createCopyBook(copyBook);
-        return ResponseEntity.ok(created);
+        return ResponseEntity.ok(mapToDto(created));
     }
 
     @DeleteMapping("/{id}")
@@ -48,7 +52,13 @@ public class CopyBookController {
         copyBookService.deleteCopyBook(id);
         return ResponseEntity.ok().build();
     }
+
+    // Entity → DTO: iç içe Book entity'si yerine düz bookId/bookTitle.
+    private CopyBookResponseDto mapToDto(CopyBook copyBook) {
+        var book = copyBook.getBook();
+        return new CopyBookResponseDto(
+                copyBook.getId(),
+                book != null ? book.getId() : null,
+                book != null ? book.getTitle() : null);
+    }
 }
-
-
-

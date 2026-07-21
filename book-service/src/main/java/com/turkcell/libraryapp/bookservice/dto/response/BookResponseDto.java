@@ -1,8 +1,13 @@
 package com.turkcell.libraryapp.bookservice.dto.response;
 
+import java.io.Serializable;
 import java.time.LocalDate;
 
-public class BookResponseDto {
+// Serializable: Redis (varsayılan JDK serileştirme) cache'e yazabilsin diye.
+public class BookResponseDto implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
     private Long id;
     private String title;
     private String isbn;
@@ -33,6 +38,10 @@ public class BookResponseDto {
     public Integer getAvailableCopies() { return availableCopies; }
     public void setAvailableCopies(Integer availableCopies) { this.availableCopies = availableCopies; }
 }
+
+
+
+
 
 
 

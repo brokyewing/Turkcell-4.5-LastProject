@@ -6,14 +6,14 @@ import java.util.List;
 @Entity
 @Table(name = "book_categories")
 public class BookCategory {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "name", nullable = false)
     private String name;
-    
+
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Book> books;
     
@@ -30,6 +30,10 @@ public class BookCategory {
     public List<Book> getBooks() { return books; }
     public void setBooks(List<Book> books) { this.books = books; }
 }
+
+
+
+
 
 
 

@@ -1,0 +1,20 @@
+package com.turkcell.libraryapp.bookservice.dto.response;
+
+// Dışarıya (API) açılan kategori temsili. Entity'nin 'books' koleksiyonu
+// gibi iç detaylar burada YOK — bu yüzden sonsuz döngü de olamaz.
+public class CategoryResponseDto {
+    private Long id;
+    private String name;
+
+    public CategoryResponseDto() {}
+
+    public CategoryResponseDto(Long id, String name) {
+        this.id = id;
+        this.name = name;
+    }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+}

@@ -6,17 +6,17 @@ import java.util.List;
 @Entity
 @Table(name = "authors")
 public class Author {
-    
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    
+
     @Column(name = "name", nullable = false)
     private String name;
-    
+
     @Column(name = "lastname", nullable = false)
     private String lastname;
-    
+
     @OneToMany(mappedBy = "author", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private List<Book> books;
     
@@ -36,6 +36,10 @@ public class Author {
     public List<Book> getBooks() { return books; }
     public void setBooks(List<Book> books) { this.books = books; }
 }
+
+
+
+
 
 
 

@@ -1,41 +1,43 @@
 package com.turkcell.libraryapp.memberservice.controller;
 
+import com.turkcell.libraryapp.memberservice.dto.StudentResponseDto;
 import com.turkcell.libraryapp.memberservice.entity.Student;
 import com.turkcell.libraryapp.memberservice.service.StudentService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/students")
+@RequiredArgsConstructor
 public class StudentController {
-    @Autowired
-    private StudentService studentService;
+    private final StudentService studentService;
 
     @GetMapping
-    public List<Student> getAllStudents() {
-        return studentService.getAllStudents();
+    public List<StudentResponseDto> getAllStudents() {
+        return studentService.getAllStudents().stream()
+                .map(StudentResponseDto::from)
+                .collect(Collectors.toList());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Student> getStudentById(@PathVariable Long id) {
-        Optional<Student> student = studentService.getStudentById(id);
-        return student.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    public ResponseEntity<StudentResponseDto> getStudentById(@PathVariable Long id) {
+        return studentService.getStudentById(id)
+                .map(s -> ResponseEntity.ok(StudentResponseDto.from(s)))
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @PostMapping
-    public ResponseEntity<Student> addStudent(@RequestBody Student student) {
-        Student created = studentService.createStudent(student);
-        return ResponseEntity.ok(created);
+    public StudentResponseDto addStudent(@RequestBody Student student) {
+        return StudentResponseDto.from(studentService.createStudent(student));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Student> updateStudent(@PathVariable Long id, @RequestBody Student student) {
-        Student updated = studentService.updateStudent(id, student);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<StudentResponseDto> updateStudent(@PathVariable Long id, @RequestBody Student student) {
+        return ResponseEntity.ok(StudentResponseDto.from(studentService.updateStudent(id, student)));
     }
 
     @DeleteMapping("/{id}")
@@ -44,9 +46,9 @@ public class StudentController {
         return ResponseEntity.ok().build();
     }
 
+    // Servisler arası varlık kontrolü (loan/fine/reservation Feign ile çağırır)
     @GetMapping("/{id}/exists")
     public Boolean existsById(@PathVariable Long id) {
         return studentService.getStudentById(id).isPresent();
     }
 }
-

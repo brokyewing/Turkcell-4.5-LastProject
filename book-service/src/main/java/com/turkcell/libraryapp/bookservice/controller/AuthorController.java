@@ -4,7 +4,7 @@ import com.turkcell.libraryapp.bookservice.dto.request.AuthorRequestDto;
 import com.turkcell.libraryapp.bookservice.dto.response.AuthorResponseDto;
 import com.turkcell.libraryapp.bookservice.entity.Author;
 import com.turkcell.libraryapp.bookservice.service.AuthorService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -14,10 +14,10 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/authors")
+@RequiredArgsConstructor
 public class AuthorController {
 
-    @Autowired
-    private AuthorService authorService;
+    private final AuthorService authorService;
 
     @GetMapping
     public List<AuthorResponseDto> getAllAuthors() {
@@ -84,6 +84,10 @@ public class AuthorController {
         return dto;
     }
 }
+
+
+
+
 
 
 

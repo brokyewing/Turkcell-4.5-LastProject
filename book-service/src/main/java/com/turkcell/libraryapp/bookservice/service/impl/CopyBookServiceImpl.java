@@ -4,17 +4,18 @@ import com.turkcell.libraryapp.bookservice.entity.CopyBook;
 import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.repository.CopyBookRepository;
 import com.turkcell.libraryapp.bookservice.service.CopyBookService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
 
 @Service
+@RequiredArgsConstructor
 public class CopyBookServiceImpl implements CopyBookService {
 
-    @Autowired
-    private CopyBookRepository copyBookRepository;
+    private final CopyBookRepository copyBookRepository;
 
     @Override
     public List<CopyBook> getAllCopyBooks() {
@@ -27,11 +28,13 @@ public class CopyBookServiceImpl implements CopyBookService {
     }
 
     @Override
+    @Transactional
     public CopyBook createCopyBook(CopyBook copyBook) {
         return copyBookRepository.save(copyBook);
     }
 
     @Override
+    @Transactional
     public void deleteCopyBook(Long id) {
         if (!copyBookRepository.existsById(id)) {
             throw new BusinessException("CopyBook not found with id: " + id);

@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Kitaplık · Mobil SaaS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600;700&family=Crimson+Pro:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet" />
+<style>
+  /* ===== ui-ux-pro-max tasarım sistemi: SaaS Mobile (High-Tech Boutique) =====
+     Palet: kitap kahvesi + sayfa amberi · Font: Cormorant Garamond / Crimson Pro */
+  :root {
+    --primary: #78716c;        /* kitap kahvesi */
+    --secondary: #92400e;      /* koyu kahve */
+    --accent: #d97706;         /* amber CTA */
+    --accent-2: #b45309;
+    --bg: #fffbeb;             /* sayfa amberi */
+    --bg-2: #fef6da;
+    --surface: #ffffff;
+    --fg: #1c1917;
+    --muted: #78716c;
+    --border: #eee6d6;
+    --danger: #dc2626;
+    --ok: #059669;
+    --shadow-sm: 0 1px 2px rgba(120,73,20,0.06), 0 4px 12px rgba(120,73,20,0.08);
+    --shadow-lg: 0 8px 30px rgba(120,73,20,0.16);
+    --r: 20px; --r-sm: 14px;
+    --font-display: 'Cormorant Garamond', Georgia, serif;
+    --font-body: 'Crimson Pro', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    font-family: var(--font-body);
+    background:
+      radial-gradient(120% 60% at 100% 0%, #fde7c4 0%, transparent 55%),
+      radial-gradient(90% 50% at 0% 10%, #fbe3bf 0%, transparent 50%),
+      var(--bg);
+    color: var(--fg);
+    font-size: 17px; line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    overflow-x: hidden;
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+  .app { max-width: 440px; margin: 0 auto; min-height: 100%; padding: env(safe-area-inset-top) 0 0; position: relative; }
+  .scroll { padding: 8px 20px 120px; }
+
+  /* Giriş animasyonu: kademeli (staggered fade + slide) */
+  .rise { opacity: 0; transform: translateY(18px); animation: rise .6s cubic-bezier(.22,1,.36,1) forwards; }
+  @keyframes rise { to { opacity: 1; transform: none; } }
+  .d1 { animation-delay: .05s } .d2 { animation-delay: .12s } .d3 { animation-delay: .2s }
+  .d4 { animation-delay: .28s } .d5 { animation-delay: .36s } .d6 { animation-delay: .44s }
+
+  /* ===== Üst başlık ===== */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px 6px; }
+  .hi .eyebrow { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-2); font-weight: 600; }
+  .hi h1 { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1.05; letter-spacing: -.01em; }
+  .avatar {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(140deg, #a8763f, #6b4a25); color: #fff;
+    display: grid; place-items: center; font-family: var(--font-display); font-size: 20px; font-weight: 600;
+    box-shadow: var(--shadow-sm); border: 2px solid #fff;
+  }
+
+  /* ===== Arama (glassmorphism) ===== */
+  .search {
+    display: flex; align-items: center; gap: 10px; margin: 14px 0 6px;
+    padding: 13px 16px; border-radius: 999px;
+    background: rgba(255,255,255,.6); backdrop-filter: blur(12px);
+    border: 1px solid rgba(255,255,255,.8); box-shadow: var(--shadow-sm);
+    color: var(--muted); font-size: 16px;
+  }
+  .search svg { color: var(--accent-2); }
+
+  /* ===== Bento ızgara ===== */
+  .bento { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 14px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); box-shadow: var(--shadow-sm); }
+  .press { transition: transform .18s cubic-bezier(.34,1.56,.64,1); cursor: pointer; }
+  .press:active { transform: scale(.96); }
+
+  .now { grid-column: 1 / -1; display: flex; gap: 14px; padding: 16px; align-items: center; position: relative; overflow: hidden; }
+  .now::after { content:''; position:absolute; inset:0; background: linear-gradient(120deg, transparent 60%, rgba(217,119,6,.06)); pointer-events:none; }
+  .cover { width: 76px; height: 106px; border-radius: 10px; flex-shrink: 0; box-shadow: var(--shadow-lg); position: relative; overflow: hidden; display: grid; place-items: center; text-align: center; padding: 8px; }
+  .cover span { font-family: var(--font-display); color: #fff; font-weight: 600; font-size: 15px; line-height: 1.1; text-shadow: 0 1px 4px rgba(0,0,0,.3); }
+  .cover::before { content:''; position:absolute; left:8px; top:6px; bottom:6px; width:3px; background: rgba(255,255,255,.25); border-radius: 2px; }
+  .c1 { background: linear-gradient(150deg, #7c3aed, #4c1d95); }
+  .c2 { background: linear-gradient(150deg, #0f766e, #134e4a); }
+  .c3 { background: linear-gradient(150deg, #b45309, #7c2d12); }
+  .c4 { background: linear-gradient(150deg, #be123c, #881337); }
+  .c5 { background: linear-gradient(150deg, #1d4ed8, #1e3a8a); }
+  .now .meta { flex: 1; min-width: 0; }
+  .now .tag { font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--accent-2); font-weight: 600; }
+  .now h3 { font-family: var(--font-display); font-size: 23px; font-weight: 600; line-height: 1.1; margin: 2px 0; }
+  .now .by { color: var(--muted); font-size: 15px; font-style: italic; }
+  .progress { height: 7px; border-radius: 99px; background: var(--bg-2); margin-top: 12px; overflow: hidden; }
+  .progress i { display: block; height: 100%; width: 64%; border-radius: 99px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+  .progress-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 6px; }
+
+  .stat { padding: 15px; display: flex; flex-direction: column; gap: 2px; position: relative; }
+  .stat .ico { width: 38px; height: 38px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 8px; }
+  .ico.amber { background: #fef3c7; color: var(--accent-2); }
+  .ico.brown { background: #efe7dd; color: var(--secondary); }
+  .stat .n { font-family: var(--font-display); font-size: 30px; font-weight: 600; line-height: 1; }
+  .stat .l { font-size: 14px; color: var(--muted); }
+  .dot { position: absolute; top: 15px; right: 15px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 0 rgba(217,119,6,.5); animation: pulse 2s infinite; }
+  @keyframes pulse { 70% { box-shadow: 0 0 0 8px rgba(217,119,6,0); } 100% { box-shadow: 0 0 0 0 rgba(217,119,6,0); } }
+  .stat.due .n { color: var(--accent-2); }
+
+  /* ===== Bölüm başlığı ===== */
+  .sec-head { display: flex; align-items: baseline; justify-content: space-between; margin: 26px 2px 12px; }
+  .sec-head h2 { font-family: var(--font-display); font-size: 24px; font-weight: 600; }
+  .sec-head a { color: var(--accent-2); font-size: 15px; font-weight: 500; text-decoration: none; }
+
+  /* ===== Yatay kaydırmalı raf ===== */
+  .rail { display: flex; gap: 14px; overflow-x: auto; padding: 4px 20px 4px; margin: 0 -20px; scroll-snap-type: x mandatory; scrollbar-width: none; }
+  .rail::-webkit-scrollbar { display: none; }
+  .book { scroll-snap-align: start; width: 128px; flex-shrink: 0; }
+  .book .cover { width: 128px; height: 180px; margin-bottom: 8px; }
+  .book .bt { font-family: var(--font-display); font-size: 18px; font-weight: 600; line-height: 1.1; }
+  .book .ba { font-size: 14px; color: var(--muted); font-style: italic; }
+  .book .rate { font-size: 13px; color: var(--accent-2); display: flex; align-items: center; gap: 3px; margin-top: 3px; }
+
+  /* ===== Öneri listesi ===== */
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .row { display: flex; align-items: center; gap: 13px; padding: 11px; }
+  .row .cover { width: 48px; height: 66px; box-shadow: var(--shadow-sm); }
+  .row .cover span { font-size: 10px; }
+  .row .info { flex: 1; min-width: 0; }
+  .row .info h4 { font-family: var(--font-display); font-size: 19px; font-weight: 600; line-height: 1.1; }
+  .row .info p { font-size: 14px; color: var(--muted); font-style: italic; }
+  .row .go { width: 34px; height: 34px; border-radius: 50%; background: var(--bg-2); display: grid; place-items: center; color: var(--accent-2); flex-shrink: 0; }
+
+  /* ===== FAB (yumuşak salınım) ===== */
+  .fab {
+    position: fixed; right: max(20px, calc(50% - 220px + 20px)); bottom: 96px; z-index: 20;
+    width: 58px; height: 58px; border-radius: 20px;
+    background: linear-gradient(145deg, var(--accent), var(--accent-2)); color: #fff;
+    display: grid; place-items: center; border: none; cursor: pointer;
+    box-shadow: 0 10px 24px rgba(180,83,9,.45); animation: bob 3s ease-in-out infinite;
+  }
+  .fab:active { transform: scale(.94); }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+
+  /* ===== Alt sekme çubuğu (glassmorphism) ===== */
+  .tabbar {
+    position: fixed; left: 50%; transform: translateX(-50%); bottom: 0; width: 100%; max-width: 440px; z-index: 15;
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+    background: rgba(255,251,235,.72); backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(238,230,214,.9);
+  }
+  .tab { display: flex; flex-direction: column; align-items: center; gap: 3px; background: none; border: none; cursor: pointer; color: var(--muted); font-family: var(--font-body); font-size: 12px; padding: 6px 0; min-height: 48px; }
+  .tab.active { color: var(--accent-2); }
+  .tab.active .pill { background: #fef3c7; }
+  .tab .pill { padding: 5px 16px; border-radius: 999px; transition: background .2s; }
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="rise d1">
+    <div class="hi">
+      <div class="eyebrow">Salı, 21 Temmuz</div>
+      <h1>Merhaba, Yusuf</h1>
+    </div>
+    <div class="avatar press">Y</div>
+  </header>
+
+  <div class="scroll">
+    <div class="search rise d1">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      <span>Kitap, yazar ya da tür ara…</span>
+    </div>
+
+    <div class="bento">
+      <div class="now card press rise d2">
+        <div class="cover c1"><span>Suç ve Ceza</span></div>
+        <div class="meta">
+          <div class="tag">Şu an okuyorsun</div>
+          <h3>Suç ve Ceza</h3>
+          <div class="by">Dostoyevski</div>
+          <div class="progress"><i></i></div>
+          <div class="progress-label"><span>324 / 508 sayfa</span><span>%64</span></div>
+        </div>
+      </div>
+
+      <div class="stat card press rise d3">
+        <div class="ico amber">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+        </div>
+        <div class="n">7</div>
+        <div class="l">gün üst üste</div>
+      </div>
+
+      <div class="stat due card press rise d3">
+        <div class="dot"></div>
+        <div class="ico brown">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <div class="n">1 gün</div>
+        <div class="l">iade süresi</div>
+      </div>
+    </div>
+
+    <div class="sec-head rise d4"><h2>Okumaya devam et</h2><a href="#">Tümü</a></div>
+    <div class="rail rise d4">
+      <div class="book press">
+        <div class="cover c2"><span>Sefiller</span></div>
+        <div class="bt">Sefiller</div><div class="ba">Victor Hugo</div>
+        <div class="rate"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z"/></svg> 4.8</div>
+      </div>
+      <div class="book press">
+        <div class="cover c3"><span>Kürk Mantolu Madonna</span></div>
+        <div class="bt">Kürk Mantolu</div><div class="ba">Sabahattin Ali</div>
+        <div class="rate"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z"/></svg> 4.7</div>
+      </div>
+      <div class="book press">
+        <div class="cover c4"><span>1984</span></div>
+        <div class="bt">1984</div><div class="ba">George Orwell</div>
+        <div class="rate"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z"/></svg> 4.9</div>
+      </div>
+      <div class="book press">
+        <div class="cover c5"><span>Simyacı</span></div>
+        <div class="bt">Simyacı</div><div class="ba">Paulo Coelho</div>
+        <div class="rate"><svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="m12 2 3 6.9 7.5.6-5.7 4.9 1.8 7.3L12 17.8 5.4 21.7l1.8-7.3L1.5 9.5 9 8.9z"/></svg> 4.6</div>
+      </div>
+    </div>
+
+    <div class="sec-head rise d5"><h2>Senin için</h2><a href="#">Tümü</a></div>
+    <div class="list rise d5">
+      <div class="row card press">
+        <div class="cover c3"><span>Tutunamayanlar</span></div>
+        <div class="info"><h4>Tutunamayanlar</h4><p>Oğuz Atay · Roman</p></div>
+        <div class="go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+      </div>
+      <div class="row card press">
+        <div class="cover c2"><span>Beyaz Diş</span></div>
+        <div class="info"><h4>Beyaz Diş</h4><p>Jack London · Macera</p></div>
+        <div class="go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+      </div>
+      <div class="row card press">
+        <div class="cover c5"><span>Nutuk</span></div>
+        <div class="info"><h4>Nutuk</h4><p>M. K. Atatürk · Tarih</p></div>
+        <div class="go"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="fab" aria-label="Kitap ödünç al">
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <nav class="tabbar">
+    <button class="tab active"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg></span>Ana Sayfa</button>
+    <button class="tab"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span>Keşfet</button>
+    <button class="tab"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg></span>Ödünçlerim</button>
+    <button class="tab"><span class="pill"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></span>Profil</button>
+  </nav>
+</div>
+
+<script>
+  // Sekme etkileşimi (gösterim amaçlı)
+  document.querySelectorAll('.tab').forEach((t) => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach((x) => x.classList.remove('active'));
+      t.classList.add('active');
+    });
+  });
+</script>
+</body>
+</html>

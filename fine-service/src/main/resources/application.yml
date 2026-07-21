@@ -18,6 +18,19 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
+  kafka:
+    bootstrap-servers: ${SPRING_KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    consumer:
+      group-id: fine-service
+      auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: "*"
+        # Producer başka pakette; gelen JSON'u bizim event sınıfımıza çevir.
+        spring.json.value.default.type: com.turkcell.libraryapp.fineservice.event.LoanReturnedEvent
+        spring.json.use.type.headers: false
+
 eureka:
   client:
     service-url:
