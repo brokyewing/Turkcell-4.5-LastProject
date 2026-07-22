@@ -31,4 +31,32 @@ eureka:
   instance:
     prefer-ip-address: false
 
+resilience4j:
+  circuitbreaker:
+    instances:
+      memberService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+      bookService:
+        slidingWindowSize: 10
+        failureRateThreshold: 50
+        waitDurationInOpenState: 10s
+        permittedNumberOfCallsInHalfOpenState: 3
+  retry:
+    instances:
+      memberServiceRetry:
+        maxAttempts: 3
+        waitDuration: 1s
+      bookServiceRetry:
+        maxAttempts: 3
+        waitDuration: 1s
+
+feign:
+  client:
+    config:
+      default:
+        connectTimeout: 2000
+        readTimeout: 5000
 
