@@ -7,26 +7,35 @@ import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.service.AuthorService;
 import com.turkcell.libraryapp.bookservice.service.BookCategoryService;
 import com.turkcell.libraryapp.bookservice.service.BookService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/books")
 @RequiredArgsConstructor
+@Tag(name = "Book Management", description = "Kitap CRUD operasyonları ve arama")
 public class BookController {
 
     private final BookService bookService;
-    
     private final AuthorService authorService;
-    
     private final BookCategoryService categoryService;
 
+    @Operation(summary = "Yeni kitap ekle", description = "ISBN, başlık, yazar ve kategori bilgisi ile yeni kitap oluşturur")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Kitap başarıyla oluşturuldu"),
+            @ApiResponse(responseCode = "400", description = "Geçersiz istek veya eksik alan"),
+            @ApiResponse(responseCode = "404", description = "Yazar veya kategori bulunamadı")
+    })
     @PostMapping
     public ResponseEntity<BookResponseDto> createBook(@Valid @RequestBody BookCreateRequest request) {
         Book book = new Book();
@@ -36,48 +45,56 @@ public class BookController {
         book.setTotalCopies(request.getTotalCopies());
         book.setAvailableCopies(request.getAvailableCopies());
         book.setStatus(request.getStatus());
-        
+
         book.setAuthor(authorService.getAuthorById(request.getAuthorId())
                 .orElseThrow(() -> new BusinessException("Author not found with ID: " + request.getAuthorId())));
         book.setCategory(categoryService.getCategoryById(request.getCategoryId())
                 .orElseThrow(() -> new BusinessException("Category not found with ID: " + request.getCategoryId())));
-        
+
         Book createdBook = bookService.createBook(book);
         BookResponseDto response = mapToDto(createdBook);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Kitap kopya sayısını güncelle", description = "Belirli bir kitabın toplam ve mevcut kopya sayısını artırır/azaltır")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Kopya sayısı güncellendi"),
+            @ApiResponse(responseCode = "400", description = "Negatif kopya sayısı veya geçersiz delta"),
+            @ApiResponse(responseCode = "404", description = "Kitap bulunamadı")
+    })
     @PatchMapping("/{id}/copies")
     public ResponseEntity<BookResponseDto> updateBookCopies(
-            @PathVariable Long id, 
-            @RequestParam String delta) {
-        
+            @Parameter(description = "Kitap ID") @PathVariable Long id,
+            @Parameter(description = "Kopya sayısı değişimi (+/-)") @RequestParam String delta) {
+
         Book book = bookService.getBookById(id)
                 .orElseThrow(() -> new BusinessException("Book not found with id: " + id));
-        
+
         int deltaValue = Integer.parseInt(delta);
         int newTotalCopies = book.getTotalCopies() + deltaValue;
         int newAvailableCopies = book.getAvailableCopies() + deltaValue;
-        
+
         if (newTotalCopies < 0 || newAvailableCopies < 0) {
             return ResponseEntity.badRequest().build();
         }
-        
+
         book.setTotalCopies(newTotalCopies);
         book.setAvailableCopies(newAvailableCopies);
-        
+
         Book updatedBook = bookService.updateBook(id, book);
         BookResponseDto response = mapToDto(updatedBook);
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Kitapları listele", description = "ISBN, başlık, yazar veya müsaitlik durumuna göre filtreleme yapılabilir")
+    @ApiResponse(responseCode = "200", description = "Kitap listesi başarıyla döndürüldü")
     @GetMapping
     public ResponseEntity<List<BookResponseDto>> getBooks(
-            @RequestParam(required = false) String isbn,
-            @RequestParam(required = false) String title,
-            @RequestParam(required = false) String author,
-            @RequestParam(required = false) Boolean available) {
-        
+            @Parameter(description = "ISBN numarası ile ara") @RequestParam(required = false) String isbn,
+            @Parameter(description = "Başlık içinde ara") @RequestParam(required = false) String title,
+            @Parameter(description = "Yazar adı ile ara") @RequestParam(required = false) String author,
+            @Parameter(description = "Sadece müsait kitaplar") @RequestParam(required = false) Boolean available) {
+
         List<Book> books;
         if (isbn != null) {
             books = bookService.findBooksByIsbn(isbn);
@@ -90,19 +107,24 @@ public class BookController {
         } else {
             books = bookService.getAllBooks();
         }
-        
+
         List<BookResponseDto> responses = books.stream()
                 .map(this::mapToDto)
                 .collect(Collectors.toList());
         return ResponseEntity.ok(responses);
     }
 
+    @Operation(summary = "Kitap detayı getir", description = "ID'ye göre tek bir kitabın detaylarını döndürür (Redis cache'li)")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Kitap bulundu"),
+            @ApiResponse(responseCode = "404", description = "Kitap bulunamadı")
+    })
     @GetMapping("/{id}")
-    public ResponseEntity<BookResponseDto> getBookById(@PathVariable Long id) {
-        // Redis ile cache'lenmiş okuma: ilk çağrı DB'ye gider, sonrakiler cache'ten döner.
+    public ResponseEntity<BookResponseDto> getBookById(
+            @Parameter(description = "Kitap ID") @PathVariable Long id) {
         return ResponseEntity.ok(bookService.getBookDtoById(id));
     }
-    
+
     private BookResponseDto mapToDto(Book book) {
         BookResponseDto dto = new BookResponseDto();
         dto.setId(book.getId());
@@ -117,10 +139,3 @@ public class BookController {
         return dto;
     }
 }
-
-
-
-
-
-
-
