@@ -4,6 +4,8 @@ import com.turkcell.libraryapp.bookservice.dto.response.BookResponseDto;
 import com.turkcell.libraryapp.bookservice.entity.Book;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 public interface BookService {
     List<Book> getAllBooks();
@@ -19,6 +21,7 @@ public interface BookService {
     List<Book> findBooksByTitleContaining(String title);
     List<Book> findBooksByAuthor(String author);
     List<Book> findBooksWithAvailableCopies();
+    Page<Book> getAllBooks(Pageable pageable);
 }
 
 

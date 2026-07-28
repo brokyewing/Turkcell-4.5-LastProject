@@ -14,6 +14,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -86,14 +89,21 @@ public class BookController {
         return ResponseEntity.ok(response);
     }
 
-    @Operation(summary = "Kitapları listele", description = "ISBN, başlık, yazar veya müsaitlik durumuna göre filtreleme yapılabilir")
-    @ApiResponse(responseCode = "200", description = "Kitap listesi başarıyla döndürüldü")
+    @Operation(summary = "Kitapları listele", description = "Filtreleme veya sayfalama ile kitap listesi")
+    @ApiResponse(responseCode = "200", description = "Kitap listesi veya sayfa")
     @GetMapping
-    public ResponseEntity<List<BookResponseDto>> getBooks(
+    public ResponseEntity<?> getBooks(
             @Parameter(description = "ISBN numarası ile ara") @RequestParam(required = false) String isbn,
             @Parameter(description = "Başlık içinde ara") @RequestParam(required = false) String title,
             @Parameter(description = "Yazar adı ile ara") @RequestParam(required = false) String author,
-            @Parameter(description = "Sadece müsait kitaplar") @RequestParam(required = false) Boolean available) {
+            @Parameter(description = "Sadece müsait kitaplar") @RequestParam(required = false) Boolean available,
+            @Parameter(description = "Sayfalama") @PageableDefault(size = 20, sort = "title") Pageable pageable) {
+
+        if (isbn == null && title == null && author == null && available == null) {
+            Page<BookResponseDto> responses = bookService.getAllBooks(pageable)
+                    .map(this::mapToDto);
+            return ResponseEntity.ok(responses);
+        }
 
         List<Book> books;
         if (isbn != null) {
@@ -102,10 +112,8 @@ public class BookController {
             books = bookService.findBooksByTitleContaining(title);
         } else if (author != null) {
             books = bookService.findBooksByAuthor(author);
-        } else if (available != null && available) {
-            books = bookService.findBooksWithAvailableCopies();
         } else {
-            books = bookService.getAllBooks();
+            books = bookService.findBooksWithAvailableCopies();
         }
 
         List<BookResponseDto> responses = books.stream()
