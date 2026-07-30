@@ -40,6 +40,13 @@ class BookRepositoryTest {
         registry.add("spring.datasource.password", postgres::getPassword);
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "create-drop");
         registry.add("spring.cache.type", () -> "none"); // testte Redis gerekmesin
+        // Slice testinde Flyway'i kapat: şemayı Hibernate `create-drop` yönetir.
+        // Aksi halde Flyway migration + Hibernate DDL çakışıp CI'da fail eder.
+        registry.add("spring.flyway.enabled", () -> "false");
+        // Eureka/discovery slice testinde gereksiz — CI'da discovery-server olmadığı için
+        // registrasyon retry'ları context load'u yavaşlatır / bozar.
+        registry.add("eureka.client.enabled", () -> "false");
+        registry.add("spring.cloud.discovery.enabled", () -> "false");
     }
 
     @Autowired BookRepository bookRepository;

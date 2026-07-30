@@ -20,14 +20,14 @@ public class Book extends BaseEntity {
     private String isbn;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "authorid", nullable = false)
+    @JoinColumn(name = "author_id", nullable = false)
     private Author author;
-    
+
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "categoryid", nullable = false)
+    @JoinColumn(name = "category_id", nullable = false)
     private BookCategory category;
-    
-    @Column(name = "publicationdate")
+
+    @Column(name = "publication_date")
     private LocalDate publicationDate;
     
     @Column(name = "total_copies", nullable = false)
