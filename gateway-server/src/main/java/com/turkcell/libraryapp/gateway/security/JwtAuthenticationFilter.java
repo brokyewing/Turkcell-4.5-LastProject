@@ -7,6 +7,7 @@ import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
@@ -27,6 +28,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final List<String> PUBLIC_PATHS = List.of(
             "/api/auth/", "/swagger", "/v3/api-docs", "/actuator");
 
+    // Kayıt ucu (yalnız POST) token istemez; GET/PUT/DELETE /api/students... hâlâ korumalı.
+    private static final String PUBLIC_STUDENTS_PATH = "/api/students";
+
     private final SecretKey key;
 
     public JwtAuthenticationFilter(@Value("${jwt.secret}") String secret) {
@@ -39,6 +43,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
 
         if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+            return chain.filter(exchange);
+        }
+        // Yalnız POST /api/students (kayıt) public; path tam eşleşmeli ki
+        // /api/students/5 gibi alt yollar da korumalı kalsın.
+        if (HttpMethod.POST.equals(exchange.getRequest().getMethod())
+                && PUBLIC_STUDENTS_PATH.equals(path)) {
             return chain.filter(exchange);
         }
 

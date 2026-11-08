@@ -19,6 +19,7 @@ public class Student {
     private String lastname;
     
     @ManyToOne(fetch = FetchType.LAZY)
+    // Kayıtta bölüm seçilmezse varsayılan "Genel" bölümü atanır (StudentServiceImpl#createStudent).
     @JoinColumn(name = "departmantid", nullable = false)
     private Department department;
     

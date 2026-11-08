@@ -4,6 +4,9 @@ server:
 spring:
   application:
     name: config-server
+  profiles:
+    # native profili olmadan config-server varsayılan git depo sağlayıcısını seçip açılışta patlar.
+    active: native
   cloud:
     config:
       server:

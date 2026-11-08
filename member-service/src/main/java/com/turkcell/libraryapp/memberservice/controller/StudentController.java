@@ -1,8 +1,10 @@
 package com.turkcell.libraryapp.memberservice.controller;
 
+import com.turkcell.libraryapp.memberservice.dto.StudentCreateRequest;
 import com.turkcell.libraryapp.memberservice.dto.StudentResponseDto;
 import com.turkcell.libraryapp.memberservice.entity.Student;
 import com.turkcell.libraryapp.memberservice.service.StudentService;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,7 +33,14 @@ public class StudentController {
     }
 
     @PostMapping
-    public StudentResponseDto addStudent(@RequestBody Student student) {
+    public StudentResponseDto addStudent(@Valid @RequestBody StudentCreateRequest request) {
+        Student student = new Student();
+        student.setStudentNumber(request.getStudentNumber());
+        student.setName(request.getName());
+        student.setLastname(request.getLastname());
+        student.setEmail(request.getEmail());
+        student.setPassword(request.getPassword());
+        // department bilerek atanmaz: kayıt anında bölüm seçimi yok, sonradan atanır.
         return StudentResponseDto.from(studentService.createStudent(student));
     }
 

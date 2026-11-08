@@ -1,5 +1,6 @@
 package com.turkcell.libraryapp.bookservice.repository;
 
+import com.turkcell.libraryapp.bookservice.config.JpaConfig;
 import com.turkcell.libraryapp.bookservice.entity.Author;
 import com.turkcell.libraryapp.bookservice.entity.Book;
 import com.turkcell.libraryapp.bookservice.entity.BookCategory;
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -27,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
 @DataJpaTest
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 @Testcontainers
+@Import(JpaConfig.class)   // @DataJpaTest slice'ı @Configuration bean'lerini taramaz; auditing'i elle getir.
 class BookRepositoryTest {
 
     @Container
