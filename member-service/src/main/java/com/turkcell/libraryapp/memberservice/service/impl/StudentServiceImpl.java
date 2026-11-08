@@ -1,7 +1,9 @@
 package com.turkcell.libraryapp.memberservice.service.impl;
 
+import com.turkcell.libraryapp.memberservice.entity.Department;
 import com.turkcell.libraryapp.memberservice.entity.Student;
 import com.turkcell.libraryapp.memberservice.exception.BusinessException;
+import com.turkcell.libraryapp.memberservice.repository.DepartmentRepository;
 import com.turkcell.libraryapp.memberservice.repository.StudentRepository;
 import com.turkcell.libraryapp.memberservice.service.StudentService;
 import lombok.RequiredArgsConstructor;
@@ -16,6 +18,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class StudentServiceImpl implements StudentService {
     private final StudentRepository studentRepository;
+    private final DepartmentRepository departmentRepository;
     private final PasswordEncoder passwordEncoder;
 
     @Override
@@ -36,6 +39,12 @@ public class StudentServiceImpl implements StudentService {
         }
         if (studentRepository.findByStudentNumber(student.getStudentNumber()).isPresent()) {
             throw new BusinessException("Student with student number " + student.getStudentNumber() + " already exists");
+        }
+        // Bölüm seçilmediyse varsayılan "Genel" bölümüne düşür — NOT NULL kısıtı doğal olarak sağlanır,
+        // yönetici sonradan değiştirebilir.
+        if (student.getDepartment() == null) {
+            student.setDepartment(departmentRepository.findByName("Genel")
+                    .orElseGet(() -> departmentRepository.save(new Department("Genel"))));
         }
         // Parolayı DB'ye hash'lenmiş yaz — düz metin ASLA saklanmaz.
         student.setPassword(passwordEncoder.encode(student.getPassword()));
