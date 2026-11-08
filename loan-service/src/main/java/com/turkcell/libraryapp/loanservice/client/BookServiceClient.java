@@ -4,6 +4,7 @@ import com.turkcell.libraryapp.loanservice.client.fallback.BookServiceClientFall
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 
 @FeignClient(name = "book-service", path = "/api/copybooks", fallbackFactory = BookServiceClientFallbackFactory.class)
 public interface BookServiceClient {
@@ -13,4 +14,12 @@ public interface BookServiceClient {
 
     @GetMapping("/{id}/available")
     Boolean isAvailable(@PathVariable Long id);
+
+    /** Ödünç verirken stoktan 1 düşer. false → müsait kopya yok. */
+    @PostMapping("/{id}/decrement")
+    Boolean decrementAvailable(@PathVariable Long id);
+
+    /** İadede stoğa 1 ekler. */
+    @PostMapping("/{id}/increment")
+    Boolean incrementAvailable(@PathVariable Long id);
 }

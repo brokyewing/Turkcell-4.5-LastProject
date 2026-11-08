@@ -24,6 +24,17 @@ public class BookServiceClientFallbackFactory implements FallbackFactory<BookSer
                 // Conservative fallback: assume NOT available to prevent over-loaning
                 return false;
             }
+
+            @Override
+            public Boolean decrementAvailable(Long id) {
+                // Stok düşülemiyorsa ödünç verme (aşırı ödünç riskini engelle).
+                return false;
+            }
+
+            @Override
+            public Boolean incrementAvailable(Long id) {
+                return false;
+            }
         };
     }
 }

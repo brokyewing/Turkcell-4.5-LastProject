@@ -82,4 +82,62 @@ class BookRepositoryTest {
     void findByIsbn_whenMissing_returnsEmpty() {
         assertTrue(bookRepository.findByIsbn("0000000000000").isEmpty());
     }
+
+    @Test
+    void decrementAvailableCopies_whenStockPositive_decrementsByExactlyOne() {
+        Book book = saveBook("9780132350884", 3, 2);
+
+        int updated = bookRepository.decrementAvailableCopies(book.getId());
+
+        assertEquals(1, updated);
+        // clearAutomatically sayesinde ilk seviye cache temizlendi; taze okuma DB'den gelir.
+        assertEquals(1, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
+    }
+
+    @Test
+    void decrementAvailableCopies_whenStockZero_affectsNoRows() {
+        Book book = saveBook("9780201616224", 1, 0);
+
+        int updated = bookRepository.decrementAvailableCopies(book.getId());
+
+        // Atomikliğin kanıtı: WHERE availableCopies > 0 koşulu 0 satır etkiler,
+        // stok negatife düşmez (oku-sonra-yaz yarışı yok).
+        assertEquals(0, updated);
+        assertEquals(0, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
+    }
+
+    @Test
+    void incrementAvailableCopies_afterDecrement_restoresStock() {
+        Book book = saveBook("9780321125217", 2, 1);
+
+        bookRepository.decrementAvailableCopies(book.getId());
+        int updated = bookRepository.incrementAvailableCopies(book.getId());
+
+        assertEquals(1, updated);
+        assertEquals(1, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
+    }
+
+    @Test
+    void incrementAvailableCopies_whenStockAlreadyFull_affectsNoRows() {
+        // BULGU-4: availableCopies == totalCopies iken iade artırması stoku şişirmemeli.
+        Book book = saveBook("9780134685991", 2, 2);
+
+        int updated = bookRepository.incrementAvailableCopies(book.getId());
+
+        assertEquals(0, updated);
+        assertEquals(2, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
+    }
+
+    private Book saveBook(String isbn, int totalCopies, int availableCopies) {
+        Author author = authorRepository.save(new Author("Robert", "Martin"));
+        BookCategory category = categoryRepository.save(new BookCategory("Yazılım"));
+        Book book = new Book();
+        book.setTitle("Clean Code " + isbn);
+        book.setIsbn(isbn);
+        book.setAuthor(author);
+        book.setCategory(category);
+        book.setTotalCopies(totalCopies);
+        book.setAvailableCopies(availableCopies);
+        return bookRepository.save(book);
+    }
 }

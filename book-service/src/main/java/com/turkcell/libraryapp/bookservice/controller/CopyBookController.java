@@ -1,6 +1,7 @@
 package com.turkcell.libraryapp.bookservice.controller;
 
 import com.turkcell.libraryapp.bookservice.dto.response.CopyBookResponseDto;
+import com.turkcell.libraryapp.bookservice.dto.response.CopyBookStockDto;
 import com.turkcell.libraryapp.bookservice.entity.CopyBook;
 import com.turkcell.libraryapp.bookservice.service.CopyBookService;
 import lombok.RequiredArgsConstructor;
@@ -39,6 +40,27 @@ public class CopyBookController {
     @GetMapping("/{id}/available")
     public Boolean isAvailable(@PathVariable Long id) {
         return copyBookService.isAvailable(id);
+    }
+
+    /** Fulfill için: kopyanın kitabı + kitabın müsait stok adedi (kitap seviyesinde müsaitlik). */
+    @GetMapping("/{id}/stock")
+    public ResponseEntity<CopyBookStockDto> getStock(@PathVariable Long id) {
+        return copyBookService.getStockByCopyBookId(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    // loan-service kopya ID'siyle çalışır (kitap ID'sini bilmez): stok düşme/artırma
+    // kopya üzerinden yapılır, book-service kopyanın kitabını çözer.
+    @PostMapping("/{id}/decrement")
+    public Boolean decrementAvailable(@PathVariable Long id) {
+        return copyBookService.decrementAvailableByCopyBook(id);
+    }
+
+    @PostMapping("/{id}/increment")
+    public Boolean incrementAvailable(@PathVariable Long id) {
+        // false → stok zaten totalCopies'te; iade telafisi stoğu şişirmez.
+        return copyBookService.incrementAvailableByCopyBook(id);
     }
 
     @PostMapping

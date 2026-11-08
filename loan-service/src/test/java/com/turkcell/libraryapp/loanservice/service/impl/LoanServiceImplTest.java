@@ -108,12 +108,50 @@ class LoanServiceImplTest {
         when(memberServiceClient.existsById(10L)).thenReturn(true);
         when(bookServiceClient.existsById(20L)).thenReturn(true);
         when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
         when(loanRepository.save(loan)).thenReturn(loan);
 
         Loan result = loanService.createLoan(loan);
 
         assertNotNull(result);
         verify(loanRepository).save(loan);
+        // Stok book-service'te düşülmüş olmalı (sahiplik: book-service)
+        verify(bookServiceClient).decrementAvailable(20L);
+    }
+
+    @Test
+    void createLoan_whenStockEmpty_throwsBusinessExceptionAndDoesNotSave() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        // book-service "stok yok" dedi → false
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> loanService.createLoan(loan));
+
+        assertEquals("Stok düşülemedi: kopya müsait değil ya da book-service yanıt vermedi (copyBookId=20)",
+                ex.getMessage());
+        verify(loanRepository, never()).save(any());
+    }
+
+    @Test
+    void createLoan_whenBookServiceUnavailableOnDecrement_throwsUnavailableNotNotAvailable() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        FeignException down = mock(FeignException.class);
+        when(down.status()).thenReturn(503);
+        when(bookServiceClient.decrementAvailable(20L)).thenThrow(down);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> loanService.createLoan(loan));
+
+        assertTrue(ex.getMessage().contains("ulaşılamadı"));
+        assertFalse(ex.getMessage().contains("Copy is not available"));
+        verify(loanRepository, never()).save(any());
     }
 
     @Test
@@ -136,6 +174,7 @@ class LoanServiceImplTest {
     @Test
     void returnLoan_marksLoanAsReturnedAndClosed() {
         Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(true);
         when(loanRepository.save(loan)).thenReturn(loan);
 
         Loan result = loanService.returnLoan(loan);
@@ -143,6 +182,70 @@ class LoanServiceImplTest {
         assertTrue(result.getIsReturned());
         assertEquals(LoanStatus.CLOSED, result.getStatus());
         assertNotNull(result.getReturnDate());
+        // İadede stok book-service'te artırılmalı
+        verify(bookServiceClient).incrementAvailable(20L);
+        // Olay yayınlandı (unit testte aktif transaction yok → doğrudan)
+        verify(loanEventPublisher).publishLoanReturned(any());
+    }
+
+    @Test
+    void returnLoan_whenStockIncrementFails_doesNotMarkReturned() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(false);
+
+        assertThrows(BusinessException.class, () -> loanService.returnLoan(loan));
+
+        verify(loanRepository, never()).save(any());
+        verify(loanEventPublisher, never()).publishLoanReturned(any());
+    }
+
+    @Test
+    void createLoan_whenSaveFailsAfterStockDecrement_compensatesWithIncrement() {
+        // BULGU-1: stok ayrı DB'de düşürüldü; save patlarsa stok geri eklenmeli.
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> loanService.createLoan(loan));
+
+        assertEquals("DB down", ex.getMessage());
+        verify(bookServiceClient).decrementAvailable(20L);
+        verify(bookServiceClient).incrementAvailable(20L); // telafi çağrısı
+    }
+
+    @Test
+    void createLoan_whenCompensationAlsoFails_originalExceptionNotMasked() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+        FeignException down = mock(FeignException.class);
+        when(bookServiceClient.incrementAvailable(20L)).thenThrow(down);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> loanService.createLoan(loan));
+
+        // Telafi patlasa bile orijinal istisna korunmalı
+        assertEquals("DB down", ex.getMessage());
+        verify(bookServiceClient).incrementAvailable(20L);
+    }
+
+    @Test
+    void returnLoan_whenSaveFailsAfterStockIncrement_compensatesWithDecrement() {
+        // BULGU-1 (simetrik): stok artırıldı; save patlarsa stok geri düşürülmeli.
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+
+        assertThrows(RuntimeException.class, () -> loanService.returnLoan(loan));
+
+        verify(bookServiceClient).incrementAvailable(20L);
+        verify(bookServiceClient).decrementAvailable(20L); // telafi çağrısı
+        verify(loanEventPublisher, never()).publishLoanReturned(any());
     }
 
     @Test

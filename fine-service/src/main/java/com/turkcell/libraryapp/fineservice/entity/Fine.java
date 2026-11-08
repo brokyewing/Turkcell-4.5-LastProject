@@ -16,7 +16,7 @@ public class Fine {
     @Column(name = "studentid", nullable = false)
     private Long studentId;
     
-    @Column(name = "borrowid", nullable = false)
+    @Column(name = "borrowid", nullable = false, unique = true)
     private Long loanId;
     
     @Column(name = "amount", nullable = false)

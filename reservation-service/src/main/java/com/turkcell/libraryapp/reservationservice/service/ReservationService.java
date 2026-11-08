@@ -15,6 +15,12 @@ public interface ReservationService {
     List<Reservation> findReservationsByCopyBookId(Long copyBookId);
     List<Reservation> findReservationsByStatus(ReservationStatus status);
     List<Reservation> findExpiredReservations();
+
+    /** Süresi dolmuş ACTIVE rezervasyonları EXPIRED yapar. Etkilenen kayıt sayısını döner. */
+    int expireReservations();
+
+    /** Müsait kitabı olan ACTIVE rezervasyonları FULFILLED yapar. Etkilenen kayıt sayısını döner. */
+    int fulfillReservations();
 }
 
 
