@@ -117,6 +117,17 @@ class BookRepositoryTest {
         assertEquals(1, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
     }
 
+    @Test
+    void incrementAvailableCopies_whenStockAlreadyFull_affectsNoRows() {
+        // BULGU-4: availableCopies == totalCopies iken iade artırması stoku şişirmemeli.
+        Book book = saveBook("9780134685991", 2, 2);
+
+        int updated = bookRepository.incrementAvailableCopies(book.getId());
+
+        assertEquals(0, updated);
+        assertEquals(2, bookRepository.findById(book.getId()).orElseThrow().getAvailableCopies());
+    }
+
     private Book saveBook(String isbn, int totalCopies, int availableCopies) {
         Author author = authorRepository.save(new Author("Robert", "Martin"));
         BookCategory category = categoryRepository.save(new BookCategory("Yazılım"));

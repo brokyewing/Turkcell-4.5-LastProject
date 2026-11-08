@@ -11,6 +11,7 @@ import com.turkcell.libraryapp.loanservice.repository.LoanRepository;
 import com.turkcell.libraryapp.loanservice.service.LoanService;
 import feign.FeignException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
@@ -18,7 +19,9 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class LoanServiceImpl implements LoanService {
@@ -56,7 +59,23 @@ public class LoanServiceImpl implements LoanService {
         // Stok yoksa kayıt hiç oluşturulmaz.
         decrementStock(loan.getCopyBookId());
 
-        return loanRepository.save(loan);
+        // Stok AYRI bir DB'de (book-service) commit edildi. Buradan sonra bu serviste
+        // bir şey patlarsa (save/flush/commit) stok düşük kalır → hayalet stok kaybı.
+        // Bu yüzden herhangi bir hata durumunda stoğu geri ekleyerek telafi ediyoruz.
+        AtomicBoolean compensated = new AtomicBoolean(false);
+        Runnable compensate = () -> {
+            if (compensated.compareAndSet(false, true)) {
+                safeIncrementStock(loan.getCopyBookId());
+            }
+        };
+        // Commit anındaki hatalar try/catch'e düşmez; rollback'te telafi buradan çalışır.
+        compensateOnRollback(compensate);
+        try {
+            return loanRepository.save(loan);
+        } catch (RuntimeException e) {
+            compensate.run();
+            throw e;
+        }
     }
 
     private void ensureStudentExists(Long studentId) {
@@ -96,7 +115,12 @@ public class LoanServiceImpl implements LoanService {
                     "book-service'e ulaşılamadı, stok düşülemedi (HTTP " + e.status() + ")");
         }
         if (!decremented) {
-            throw new BusinessException("Copy is not available");
+            // false iki durumdan gelebilir: gerçekten stok yok VEYA book-service'e
+            // ulaşılamadı (fallback false döner). Kesin nedeni bilmediğimiz için mesaj
+            // ikisini de kapsar; "Copy is not available" diyip nedeni maskeliyorduk.
+            throw new BusinessException(
+                    "Stok düşülemedi: kopya müsait değil ya da book-service yanıt vermedi (copyBookId="
+                            + copyBookId + ")");
         }
     }
 
@@ -110,6 +134,53 @@ public class LoanServiceImpl implements LoanService {
         }
         if (!incremented) {
             throw new BusinessException("Stok artırılamadı (book-service başarısız yanıt): " + copyBookId);
+        }
+    }
+
+    /**
+     * Transaction rollback'e (commit hatası dahil) düşerse stok telafisini çalıştırır.
+     * Aktif transaction yoksa (ör. unit test) boş döner; çağıran try/catch halleder.
+     */
+    private void compensateOnRollback(Runnable compensation) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCompletion(int status) {
+                if (status != STATUS_COMMITTED) {
+                    compensation.run();
+                }
+            }
+        });
+    }
+
+    /**
+     * Stok telafisi (increment). Telafi çağrısının kendisi patlarsa orijinal istisnayı
+     * MASKELEMEZ: loglar ve devam eder.
+     */
+    private void safeIncrementStock(Long copyBookId) {
+        try {
+            Boolean ok = bookServiceClient.incrementAvailable(copyBookId);
+            if (!Boolean.TRUE.equals(ok)) {
+                log.error("Stok telafisi etkisiz kaldı (increment false), copyBookId={}", copyBookId);
+            }
+        } catch (RuntimeException e) {
+            log.error("Stok telafisi başarısız (increment, copyBookId={}): {}", copyBookId, e.getMessage());
+        }
+    }
+
+    /**
+     * Stok telafisi (decrement) — iade akışında stok fazla artırıldıysa geri düşürür.
+     */
+    private void safeDecrementStock(Long copyBookId) {
+        try {
+            Boolean ok = bookServiceClient.decrementAvailable(copyBookId);
+            if (!Boolean.TRUE.equals(ok)) {
+                log.error("Stok telafisi etkisiz kaldı (decrement false), copyBookId={}", copyBookId);
+            }
+        } catch (RuntimeException e) {
+            log.error("Stok telafisi başarısız (decrement, copyBookId={}): {}", copyBookId, e.getMessage());
         }
     }
 
@@ -129,18 +200,32 @@ public class LoanServiceImpl implements LoanService {
         // Stok önce artırılır: book-service erişilemezse iade reddedilir (stok sızmasın).
         incrementStock(loan.getCopyBookId());
 
-        loan.setReturnDate(LocalDateTime.now());
-        loan.setIsReturned(true);
-        loan.setStatus(LoanStatus.CLOSED);
-        Loan saved = loanRepository.save(loan);
+        // Tersi yön: stok artırıldıktan sonra bu serviste bir şey patlarsa (save/commit)
+        // stok şişer ve totalCopies aşılabilir. Hata olursa stok geri düşürülür.
+        AtomicBoolean compensated = new AtomicBoolean(false);
+        Runnable compensate = () -> {
+            if (compensated.compareAndSet(false, true)) {
+                safeDecrementStock(loan.getCopyBookId());
+            }
+        };
+        compensateOnRollback(compensate);
+        try {
+            loan.setReturnDate(LocalDateTime.now());
+            loan.setIsReturned(true);
+            loan.setStatus(LoanStatus.CLOSED);
+            Loan saved = loanRepository.save(loan);
 
-        // Olayı yayınla — fine-service asenkron dinleyip gecikme cezası kesecek.
-        // loan-service, cezanın kesilip kesilmediğini BİLMEZ ve UMURSAMAZ (gevşek bağlılık).
-        // Commit'ten ÖNCE yayınlarsak transaction geri alındığında "hayalet" olay kalır;
-        // bu yüzden yayın afterCommit'e ertelenir.
-        publishAfterCommit(new LoanReturnedEvent(
-                saved.getId(), saved.getStudentId(), saved.getDueDate(), saved.getReturnDate()));
-        return saved;
+            // Olayı yayınla — fine-service asenkron dinleyip gecikme cezası kesecek.
+            // loan-service, cezanın kesilip kesilmediğini BİLMEZ ve UMURSAMAZ (gevşek bağlılık).
+            // Commit'ten ÖNCE yayınlarsak transaction geri alındığında "hayalet" olay kalır;
+            // bu yüzden yayın afterCommit'e ertelenir.
+            publishAfterCommit(new LoanReturnedEvent(
+                    saved.getId(), saved.getStudentId(), saved.getDueDate(), saved.getReturnDate()));
+            return saved;
+        } catch (RuntimeException e) {
+            compensate.run();
+            throw e;
+        }
     }
 
     private void publishAfterCommit(LoanReturnedEvent event) {

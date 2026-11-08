@@ -18,6 +18,14 @@ public class Reservation {
     
     @Column(name = "copyid", nullable = false)
     private Long copyBookId;
+
+    /**
+     * Kopyanın bağlı olduğu kitap. FULFILLED rezervasyonların hangi kitabın stoğunu
+     * tükettiğini tek DB sorgusuyla sayabilmek için fulfill sırasında doldurulur
+     * (book-service'e ek çağrı yapmadan oversell'i önler).
+     */
+    @Column(name = "bookid")
+    private Long bookId;
     
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
@@ -44,6 +52,8 @@ public class Reservation {
     public void setStudentId(Long studentId) { this.studentId = studentId; }
     public Long getCopyBookId() { return copyBookId; }
     public void setCopyBookId(Long copyBookId) { this.copyBookId = copyBookId; }
+    public Long getBookId() { return bookId; }
+    public void setBookId(Long bookId) { this.bookId = bookId; }
     public ReservationStatus getStatus() { return status; }
     public void setStatus(ReservationStatus status) { this.status = status; }
     public LocalDateTime getReservationDate() { return reservationDate; }

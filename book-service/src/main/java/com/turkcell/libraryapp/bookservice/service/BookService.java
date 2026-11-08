@@ -30,8 +30,12 @@ public interface BookService {
      */
     boolean decrementAvailableCopies(Long bookId);
 
-    /** Kitabın stoğunu 1 artırır (iade). Kitap yoksa BusinessException. */
-    void incrementAvailableCopies(Long bookId);
+    /**
+     * Kitabın stoğunu 1 artırır (iade); stok totalCopies'i aşmaz.
+     * @return true → stok arttı; false → stok zaten dolu (artırılmadı)
+     * @throws com.turkcell.libraryapp.bookservice.exception.BusinessException kitap hiç yoksa
+     */
+    boolean incrementAvailableCopies(Long bookId);
 }
 
 

@@ -21,6 +21,12 @@ public interface ReservationRepository extends JpaRepository<Reservation, Long> 
     
     @Query("SELECT r FROM Reservation r WHERE r.expireAt < :now AND r.status = 'ACTIVE'")
     List<Reservation> findExpiredReservations(@Param("now") LocalDateTime now);
+
+    /**
+     * Bir kitaba ait FULFILLED rezervasyon sayısı. Fulfill edilmiş rezervasyonlar
+     * stoktan tüketilmiş sayılır; sonraki turlarda müsaitlik hesabına düşülür.
+     */
+    long countByBookIdAndStatus(Long bookId, ReservationStatus status);
 }
 
 

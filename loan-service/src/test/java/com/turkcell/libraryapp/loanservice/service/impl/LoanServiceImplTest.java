@@ -131,7 +131,8 @@ class LoanServiceImplTest {
         BusinessException ex = assertThrows(BusinessException.class,
                 () -> loanService.createLoan(loan));
 
-        assertEquals("Copy is not available", ex.getMessage());
+        assertEquals("Stok düşülemedi: kopya müsait değil ya da book-service yanıt vermedi (copyBookId=20)",
+                ex.getMessage());
         verify(loanRepository, never()).save(any());
     }
 
@@ -195,6 +196,55 @@ class LoanServiceImplTest {
         assertThrows(BusinessException.class, () -> loanService.returnLoan(loan));
 
         verify(loanRepository, never()).save(any());
+        verify(loanEventPublisher, never()).publishLoanReturned(any());
+    }
+
+    @Test
+    void createLoan_whenSaveFailsAfterStockDecrement_compensatesWithIncrement() {
+        // BULGU-1: stok ayrı DB'de düşürüldü; save patlarsa stok geri eklenmeli.
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> loanService.createLoan(loan));
+
+        assertEquals("DB down", ex.getMessage());
+        verify(bookServiceClient).decrementAvailable(20L);
+        verify(bookServiceClient).incrementAvailable(20L); // telafi çağrısı
+    }
+
+    @Test
+    void createLoan_whenCompensationAlsoFails_originalExceptionNotMasked() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+        FeignException down = mock(FeignException.class);
+        when(bookServiceClient.incrementAvailable(20L)).thenThrow(down);
+
+        RuntimeException ex = assertThrows(RuntimeException.class, () -> loanService.createLoan(loan));
+
+        // Telafi patlasa bile orijinal istisna korunmalı
+        assertEquals("DB down", ex.getMessage());
+        verify(bookServiceClient).incrementAvailable(20L);
+    }
+
+    @Test
+    void returnLoan_whenSaveFailsAfterStockIncrement_compensatesWithDecrement() {
+        // BULGU-1 (simetrik): stok artırıldı; save patlarsa stok geri düşürülmeli.
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(true);
+        when(loanRepository.save(loan)).thenThrow(new RuntimeException("DB down"));
+
+        assertThrows(RuntimeException.class, () -> loanService.returnLoan(loan));
+
+        verify(bookServiceClient).incrementAvailable(20L);
+        verify(bookServiceClient).decrementAvailable(20L); // telafi çağrısı
         verify(loanEventPublisher, never()).publishLoanReturned(any());
     }
 

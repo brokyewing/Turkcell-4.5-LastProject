@@ -1,5 +1,6 @@
 package com.turkcell.libraryapp.bookservice.service.impl;
 
+import com.turkcell.libraryapp.bookservice.dto.response.CopyBookStockDto;
 import com.turkcell.libraryapp.bookservice.entity.CopyBook;
 import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.repository.CopyBookRepository;
@@ -60,6 +61,18 @@ public class CopyBookServiceImpl implements CopyBookService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public Optional<CopyBookStockDto> getStockByCopyBookId(Long copyBookId) {
+        // Rezervasyon fulfill'ı kopya bazında gelir ama müsaitlik kitap seviyesindedir;
+        // bu yüzden kopyanın kitabını ve o kitabın stok adedini birlikte döndürüyoruz.
+        return copyBookRepository.findById(copyBookId)
+                .filter(copyBook -> copyBook.getBook() != null)
+                .map(copyBook -> new CopyBookStockDto(
+                        copyBook.getBook().getId(),
+                        copyBook.getBook().getAvailableCopies()));
+    }
+
+    @Override
     public List<CopyBook> getCopyBooksByBookId(Long bookId) {
         return copyBookRepository.findByBookId(bookId);
     }
@@ -72,8 +85,8 @@ public class CopyBookServiceImpl implements CopyBookService {
 
     @Override
     @Transactional
-    public void incrementAvailableByCopyBook(Long copyBookId) {
-        bookService.incrementAvailableCopies(resolveBookId(copyBookId));
+    public boolean incrementAvailableByCopyBook(Long copyBookId) {
+        return bookService.incrementAvailableCopies(resolveBookId(copyBookId));
     }
 
     private Long resolveBookId(Long copyBookId) {

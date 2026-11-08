@@ -40,9 +40,14 @@ public interface BookRepository extends JpaRepository<Book, Long> {
            "WHERE b.id = :id AND b.availableCopies > 0")
     int decrementAvailableCopies(@Param("id") Long id);
 
-    /** İadede stoğu atomik olarak 1 artırır. Etkilenen satır 0 ise kitap yok. */
+    /**
+     * İadede stoğu atomik olarak 1 artırır; stok hiçbir zaman totalCopies'i aşamaz.
+     * `availableCopies < totalCopies` koşulu, iade telafisinin stoğu şişirmesini engeller.
+     * Etkilenen satır 0 ise ya kitap yok ya da stok zaten dolu.
+     */
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE Book b SET b.availableCopies = b.availableCopies + 1 WHERE b.id = :id")
+    @Query("UPDATE Book b SET b.availableCopies = b.availableCopies + 1 " +
+           "WHERE b.id = :id AND b.availableCopies < b.totalCopies")
     int incrementAvailableCopies(@Param("id") Long id);
 }
 

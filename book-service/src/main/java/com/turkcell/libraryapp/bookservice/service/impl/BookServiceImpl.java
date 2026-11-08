@@ -139,10 +139,16 @@ public class BookServiceImpl implements BookService {
     @Override
     @Transactional
     @CacheEvict(value = "books", key = "#bookId")
-    public void incrementAvailableCopies(Long bookId) {
-        if (bookRepository.incrementAvailableCopies(bookId) == 0) {
+    public boolean incrementAvailableCopies(Long bookId) {
+        // Atomik: kontrol ve artırma tek UPDATE cümlesinde (availableCopies < totalCopies).
+        // 0 satır → kitap yok ya da stok zaten dolu.
+        if (bookRepository.incrementAvailableCopies(bookId) > 0) {
+            return true;
+        }
+        if (!bookRepository.existsById(bookId)) {
             throw new BusinessException("Book not found with id: " + bookId);
         }
+        return false;
     }
 
     private BookResponseDto toDto(Book book) {
