@@ -90,6 +90,13 @@ function Shell({ onLogout }) {
 export default function App() {
   const [authed, setAuthed] = useState(isAuthed())
 
+  // 401 alındığında api katmanı bu olayı yayınlar; oturumu burada kapatıyoruz.
+  useEffect(() => {
+    function onLogout() { setAuthed(false) }
+    window.addEventListener('auth:logout', onLogout)
+    return () => window.removeEventListener('auth:logout', onLogout)
+  }, [])
+
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 
   return (

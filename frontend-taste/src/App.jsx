@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api, setToken, getToken, decodeToken } from './api'
 import AdminView from './admin.jsx'
 import UserView from './user.jsx'
@@ -6,6 +6,13 @@ import UserView from './user.jsx'
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken())
   const [surface, setSurface] = useState('user')
+
+  // 401 alındığında api katmanı bu olayı yayınlar; oturumu burada kapatıyoruz.
+  useEffect(() => {
+    function onLogout() { setAuthed(false) }
+    window.addEventListener('auth:logout', onLogout)
+    return () => window.removeEventListener('auth:logout', onLogout)
+  }, [])
 
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 

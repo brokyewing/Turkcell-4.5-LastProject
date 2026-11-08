@@ -33,6 +33,8 @@ async function request(path, options = {}) {
 
   if (res.status === 401) {
     setToken(null)
+    // Token temizlendi; App.jsx dinleyip oturumu kapatıyor (login ekranına dönüş).
+    window.dispatchEvent(new Event('auth:logout'))
     throw new Error('Oturum geçersiz veya yetkiniz yok. Lütfen tekrar giriş yapın.')
   }
   if (!res.ok) {

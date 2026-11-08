@@ -12,7 +12,10 @@ export function getToken() { return token }
 export function decodeToken() {
   if (!token) return null
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    // JWT base64url kodludur: '-' → '+', '_' → '/' ve '=' dolgusu gerekir.
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
+    const payload = JSON.parse(atob(pad))
     return { studentId: payload.studentId, name: payload.name, sub: payload.sub }
   } catch {
     return null
@@ -26,6 +29,8 @@ async function request(path, options = {}) {
   const res = await fetch(`/api${path}`, { ...options, headers })
   if (res.status === 401) {
     setToken(null)
+    // Token temizlendi; App.jsx dinleyip oturumu kapatıyor (login ekranına dönüş).
+    window.dispatchEvent(new Event('auth:logout'))
     throw new Error('Oturum geçersiz. Lütfen tekrar giriş yapın.')
   }
   if (!res.ok) {
@@ -66,6 +71,4 @@ export const api = {
   createLoan: (body) => request('/loans', { method: 'POST', body: JSON.stringify(body) }),
   returnLoan: (loanId) => request('/loans/return', { method: 'POST', body: JSON.stringify({ loanId }) }),
   getMyFinesTotal: (studentId) => request(`/fines/students/${studentId}/total`),
-  payFine: (fineId) => request(`/fines/${fineId}/pay`, { method: 'POST' }),
-  getReservations: () => request('/reservations'),
 }

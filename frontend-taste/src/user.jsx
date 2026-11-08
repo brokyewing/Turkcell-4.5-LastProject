@@ -64,6 +64,11 @@ export default function UserView({ me }) {
   async function confirmBorrow(e) {
     e.preventDefault()
     if (!borrow) return
+    // decodeToken çözülemediyse studentId NaN olur; backend'e bozuk istek gönderme.
+    if (me.studentId == null || Number.isNaN(Number(me.studentId))) {
+      setMsg({ err: true, text: 'Oturum bilgisi okunamadı. Lütfen tekrar giriş yapın.' })
+      return
+    }
     setBusy(true); setMsg(null)
     try {
       await api.createLoan({
@@ -104,7 +109,7 @@ export default function UserView({ me }) {
           <p>Bugün ne okumak istersin?</p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <div className="badge warn">Toplam ceza: {fmtMoney(finesTotal)} TL</div>
+          <div className="badge warn">Ödenmemiş ceza: {fmtMoney(finesTotal)} TL</div>
           <div className="badge warn">{openLoans.length} açık ödünç</div>
         </div>
       </div>
@@ -154,7 +159,7 @@ export default function UserView({ me }) {
               <thead><tr><th>Ödünç #</th><th>Kopya</th><th>İade tarihi</th><th>Durum</th><th>İşlem</th></tr></thead>
               <tbody>
                 {openLoans.map((l) => {
-                  const overdue = l.dueDate && new Date(l.dueDate) < new Date()
+                  const overdue = l.dueDate && startOfDay(new Date(l.dueDate)) < startOfDay(new Date())
                   return (
                     <tr key={l.id}>
                       <td className="num">{l.id}</td>
@@ -187,7 +192,8 @@ export default function UserView({ me }) {
         ) : (
           <div className="books">
             {books.map((b, i) => {
-              const hasFree = freeCopies(b.id).length > 0
+              const freeCount = freeCopies(b.id).length
+              const hasFree = freeCount > 0
               return (
                 <div className="book rise" key={b.id} style={{ animationDelay: `${i * 0.03}s` }}>
                   <div className={`cover c${b.id % 6}`}><b>{b.title}</b></div>
@@ -195,12 +201,12 @@ export default function UserView({ me }) {
                     <div className="t">{b.title}</div>
                     <div className="a">{b.authorName} {b.authorLastname}</div>
                     <div className="st">
-                      {b.availableCopies > 0
-                        ? <span className="badge ok">{b.availableCopies} müsait</span>
+                      {freeCount > 0
+                        ? <span className="badge ok">{freeCount} müsait</span>
                         : <span className="badge dan">Tükendi</span>}
                     </div>
                     <button className="btn line sm" style={{ marginTop: 9, width: '100%', justifyContent: 'center' }}
-                      disabled={b.availableCopies <= 0 || !hasFree || busy}
+                      disabled={!hasFree || busy}
                       onClick={() => startBorrow(b)}>
                       Ödünç Al
                     </button>
@@ -218,6 +224,13 @@ export default function UserView({ me }) {
 function addDays(d, n) {
   const x = new Date(d)
   x.setDate(x.getDate() + n)
+  return x
+}
+
+// Saat bileşenini sıfırla; gün bazında karşılaştırma için (backend ChronoUnit.DAYS ile hizalı).
+function startOfDay(d) {
+  const x = new Date(d)
+  x.setHours(0, 0, 0, 0)
   return x
 }
 
