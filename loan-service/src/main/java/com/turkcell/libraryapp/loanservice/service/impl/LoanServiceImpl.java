@@ -13,6 +13,8 @@ import feign.FeignException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,6 +51,11 @@ public class LoanServiceImpl implements LoanService {
         if (loanRepository.existsByCopyBookIdAndIsReturnedFalse(loan.getCopyBookId())) {
             throw new BusinessException("CopyBook is already loaned");
         }
+
+        // Stok book-service'in sahipliğinde; oradan atomik olarak düşülür.
+        // Stok yoksa kayıt hiç oluşturulmaz.
+        decrementStock(loan.getCopyBookId());
+
         return loanRepository.save(loan);
     }
 
@@ -79,6 +86,33 @@ public class LoanServiceImpl implements LoanService {
         }
     }
 
+    private void decrementStock(Long copyBookId) {
+        boolean decremented;
+        try {
+            decremented = Boolean.TRUE.equals(bookServiceClient.decrementAvailable(copyBookId));
+        } catch (FeignException e) {
+            // Feign hatası = "ulaşılamadı". Stok düşülemediği için ödünç verilmez.
+            throw new BusinessException(
+                    "book-service'e ulaşılamadı, stok düşülemedi (HTTP " + e.status() + ")");
+        }
+        if (!decremented) {
+            throw new BusinessException("Copy is not available");
+        }
+    }
+
+    private void incrementStock(Long copyBookId) {
+        boolean incremented;
+        try {
+            incremented = Boolean.TRUE.equals(bookServiceClient.incrementAvailable(copyBookId));
+        } catch (FeignException e) {
+            throw new BusinessException(
+                    "book-service'e ulaşılamadı, stok artırılamadı (HTTP " + e.status() + ")");
+        }
+        if (!incremented) {
+            throw new BusinessException("Stok artırılamadı (book-service başarısız yanıt): " + copyBookId);
+        }
+    }
+
     @Override
     @Transactional
     public Loan updateLoan(Long id, Loan loanDetails) {
@@ -92,6 +126,9 @@ public class LoanServiceImpl implements LoanService {
     @Override
     @Transactional
     public Loan returnLoan(Loan loan) {
+        // Stok önce artırılır: book-service erişilemezse iade reddedilir (stok sızmasın).
+        incrementStock(loan.getCopyBookId());
+
         loan.setReturnDate(LocalDateTime.now());
         loan.setIsReturned(true);
         loan.setStatus(LoanStatus.CLOSED);
@@ -99,9 +136,25 @@ public class LoanServiceImpl implements LoanService {
 
         // Olayı yayınla — fine-service asenkron dinleyip gecikme cezası kesecek.
         // loan-service, cezanın kesilip kesilmediğini BİLMEZ ve UMURSAMAZ (gevşek bağlılık).
-        loanEventPublisher.publishLoanReturned(new LoanReturnedEvent(
+        // Commit'ten ÖNCE yayınlarsak transaction geri alındığında "hayalet" olay kalır;
+        // bu yüzden yayın afterCommit'e ertelenir.
+        publishAfterCommit(new LoanReturnedEvent(
                 saved.getId(), saved.getStudentId(), saved.getDueDate(), saved.getReturnDate()));
         return saved;
+    }
+
+    private void publishAfterCommit(LoanReturnedEvent event) {
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            // Aktif transaction yok (ör. unit test) → doğrudan yayınla.
+            loanEventPublisher.publishLoanReturned(event);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                loanEventPublisher.publishLoanReturned(event);
+            }
+        });
     }
 
     @Override

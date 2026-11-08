@@ -108,12 +108,49 @@ class LoanServiceImplTest {
         when(memberServiceClient.existsById(10L)).thenReturn(true);
         when(bookServiceClient.existsById(20L)).thenReturn(true);
         when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(true);
         when(loanRepository.save(loan)).thenReturn(loan);
 
         Loan result = loanService.createLoan(loan);
 
         assertNotNull(result);
         verify(loanRepository).save(loan);
+        // Stok book-service'te düşülmüş olmalı (sahiplik: book-service)
+        verify(bookServiceClient).decrementAvailable(20L);
+    }
+
+    @Test
+    void createLoan_whenStockEmpty_throwsBusinessExceptionAndDoesNotSave() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        // book-service "stok yok" dedi → false
+        when(bookServiceClient.decrementAvailable(20L)).thenReturn(false);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> loanService.createLoan(loan));
+
+        assertEquals("Copy is not available", ex.getMessage());
+        verify(loanRepository, never()).save(any());
+    }
+
+    @Test
+    void createLoan_whenBookServiceUnavailableOnDecrement_throwsUnavailableNotNotAvailable() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now());
+        when(memberServiceClient.existsById(10L)).thenReturn(true);
+        when(bookServiceClient.existsById(20L)).thenReturn(true);
+        when(loanRepository.existsByCopyBookIdAndIsReturnedFalse(20L)).thenReturn(false);
+        FeignException down = mock(FeignException.class);
+        when(down.status()).thenReturn(503);
+        when(bookServiceClient.decrementAvailable(20L)).thenThrow(down);
+
+        BusinessException ex = assertThrows(BusinessException.class,
+                () -> loanService.createLoan(loan));
+
+        assertTrue(ex.getMessage().contains("ulaşılamadı"));
+        assertFalse(ex.getMessage().contains("Copy is not available"));
+        verify(loanRepository, never()).save(any());
     }
 
     @Test
@@ -136,6 +173,7 @@ class LoanServiceImplTest {
     @Test
     void returnLoan_marksLoanAsReturnedAndClosed() {
         Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(true);
         when(loanRepository.save(loan)).thenReturn(loan);
 
         Loan result = loanService.returnLoan(loan);
@@ -143,6 +181,21 @@ class LoanServiceImplTest {
         assertTrue(result.getIsReturned());
         assertEquals(LoanStatus.CLOSED, result.getStatus());
         assertNotNull(result.getReturnDate());
+        // İadede stok book-service'te artırılmalı
+        verify(bookServiceClient).incrementAvailable(20L);
+        // Olay yayınlandı (unit testte aktif transaction yok → doğrudan)
+        verify(loanEventPublisher).publishLoanReturned(any());
+    }
+
+    @Test
+    void returnLoan_whenStockIncrementFails_doesNotMarkReturned() {
+        Loan loan = new Loan(10L, 20L, LocalDateTime.now().minusDays(7));
+        when(bookServiceClient.incrementAvailable(20L)).thenReturn(false);
+
+        assertThrows(BusinessException.class, () -> loanService.returnLoan(loan));
+
+        verify(loanRepository, never()).save(any());
+        verify(loanEventPublisher, never()).publishLoanReturned(any());
     }
 
     @Test

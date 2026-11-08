@@ -25,4 +25,11 @@ eureka:
   instance:
     prefer-ip-address: false
 
+# Rezervasyon zamanlanmış işleri (expire + fulfill)
+reservation:
+  scheduler:
+    enabled: ${RESERVATION_SCHEDULER_ENABLED:true}
+    expire-interval-ms: ${RESERVATION_EXPIRE_INTERVAL_MS:60000}
+    fulfill-interval-ms: ${RESERVATION_FULFILL_INTERVAL_MS:60000}
+
 

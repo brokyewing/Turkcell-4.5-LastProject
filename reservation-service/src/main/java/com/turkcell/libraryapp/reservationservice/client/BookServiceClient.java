@@ -9,4 +9,8 @@ public interface BookServiceClient {
 
     @GetMapping("/{id}/exists")
     Boolean existsById(@PathVariable Long id);
+
+    /** Kopyanın bağlı olduğu kitapta müsait stok var mı? (Rezervasyon fulfill kontrolü) */
+    @GetMapping("/{id}/available")
+    Boolean isAvailable(@PathVariable Long id);
 }

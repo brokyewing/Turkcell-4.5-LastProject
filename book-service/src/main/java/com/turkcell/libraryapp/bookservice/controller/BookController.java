@@ -89,6 +89,29 @@ public class BookController {
         return ResponseEntity.ok(response);
     }
 
+    @Operation(summary = "Stoktan 1 düş", description = "Ödünç verirken atomik olarak müsait kopya sayısını 1 azaltır. Stok yoksa false döner.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "true: stok düştü, false: müsait kopya yok"),
+            @ApiResponse(responseCode = "400", description = "Kitap bulunamadı")
+    })
+    @PostMapping("/{id}/decrement")
+    public ResponseEntity<Boolean> decrementAvailableCopies(
+            @Parameter(description = "Kitap ID") @PathVariable Long id) {
+        return ResponseEntity.ok(bookService.decrementAvailableCopies(id));
+    }
+
+    @Operation(summary = "Stoğa 1 ekle", description = "İadede atomik olarak müsait kopya sayısını 1 artırır.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Stok artırıldı"),
+            @ApiResponse(responseCode = "400", description = "Kitap bulunamadı")
+    })
+    @PostMapping("/{id}/increment")
+    public ResponseEntity<Void> incrementAvailableCopies(
+            @Parameter(description = "Kitap ID") @PathVariable Long id) {
+        bookService.incrementAvailableCopies(id);
+        return ResponseEntity.ok().build();
+    }
+
     @Operation(summary = "Kitapları listele", description = "Filtreleme veya sayfalama ile kitap listesi")
     @ApiResponse(responseCode = "200", description = "Kitap listesi veya sayfa")
     @GetMapping

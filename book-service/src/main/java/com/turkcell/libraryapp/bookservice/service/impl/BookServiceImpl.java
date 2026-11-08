@@ -122,6 +122,29 @@ public class BookServiceImpl implements BookService {
         return bookRepository.findAll(pageable);
     }
 
+    @Override
+    @Transactional
+    @CacheEvict(value = "books", key = "#bookId")   // stok değişince cache'teki DTO bayatlamasın
+    public boolean decrementAvailableCopies(Long bookId) {
+        // Atomik: kontrol ve azaltma tek UPDATE cümlesinde. 0 satır → stok yok.
+        if (bookRepository.decrementAvailableCopies(bookId) > 0) {
+            return true;
+        }
+        if (!bookRepository.existsById(bookId)) {
+            throw new BusinessException("Book not found with id: " + bookId);
+        }
+        return false;
+    }
+
+    @Override
+    @Transactional
+    @CacheEvict(value = "books", key = "#bookId")
+    public void incrementAvailableCopies(Long bookId) {
+        if (bookRepository.incrementAvailableCopies(bookId) == 0) {
+            throw new BusinessException("Book not found with id: " + bookId);
+        }
+    }
+
     private BookResponseDto toDto(Book book) {
         BookResponseDto dto = new BookResponseDto();
         dto.setId(book.getId());

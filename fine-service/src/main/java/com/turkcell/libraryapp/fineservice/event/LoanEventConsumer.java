@@ -4,12 +4,15 @@ import com.turkcell.libraryapp.fineservice.entity.Fine;
 import com.turkcell.libraryapp.fineservice.enums.FineType;
 import com.turkcell.libraryapp.fineservice.repository.FineRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class LoanEventConsumer {
@@ -45,7 +48,17 @@ public class LoanEventConsumer {
         fine.setFineType(FineType.LATE_RETURN);
         fine.setDailyRate(DAILY_RATE);
         fine.setCreatedDate(LocalDateTime.now());
-        fineRepository.save(fine);
+
+        try {
+            // saveAndFlush: unique constraint ihlali burada, try bloğunun içinde patlar
+            // (commit'e ertelenirse yakalayamayız).
+            fineRepository.saveAndFlush(fine);
+        } catch (DataIntegrityViolationException e) {
+            // Eşzamanlı teslim edilen mükerrer mesaj: borrowid UNIQUE constraint'i yakaladı.
+            // İdempotency burada garanti; mesajı yut, offset ilerlesin.
+            log.info("Mükerrer loan.returned olayı yutuldu (loanId={}): {}", event.getLoanId(), e.getMessage());
+            return;
+        }
 
         System.out.println(">>> OTOMATIK CEZA KESILDI: " + amount + " TL (" + overdueDays + " gun gecikme), loanId=" + event.getLoanId());
     }

@@ -3,6 +3,7 @@ package com.turkcell.libraryapp.bookservice.service.impl;
 import com.turkcell.libraryapp.bookservice.entity.CopyBook;
 import com.turkcell.libraryapp.bookservice.exception.BusinessException;
 import com.turkcell.libraryapp.bookservice.repository.CopyBookRepository;
+import com.turkcell.libraryapp.bookservice.service.BookService;
 import com.turkcell.libraryapp.bookservice.service.CopyBookService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -16,6 +17,7 @@ import java.util.Optional;
 public class CopyBookServiceImpl implements CopyBookService {
 
     private final CopyBookRepository copyBookRepository;
+    private final BookService bookService;
 
     @Override
     public List<CopyBook> getAllCopyBooks() {
@@ -49,13 +51,35 @@ public class CopyBookServiceImpl implements CopyBookService {
 
     @Override
     public boolean isAvailable(Long id) {
-        Optional<CopyBook> copyBook = copyBookRepository.findById(id);
-        return copyBook.isPresent(); // Simplified - would need to check if not loaned
+        // book-service ödünç kaydını TUTMAZ (o loan-service'in verisi). Bu yüzden burada
+        // söyleyebileceğimiz tek doğru şey: kopya var mı ve bağlı olduğu kitabın stoğu var mı.
+        // Kopya bazlı "şu an ödünçte mi" sorusunun sahibi loan-service'tir.
+        return copyBookRepository.findById(id)
+                .map(copyBook -> copyBook.getBook() != null && copyBook.getBook().getAvailableCopies() > 0)
+                .orElse(false);
     }
 
     @Override
     public List<CopyBook> getCopyBooksByBookId(Long bookId) {
         return copyBookRepository.findByBookId(bookId);
+    }
+
+    @Override
+    @Transactional
+    public boolean decrementAvailableByCopyBook(Long copyBookId) {
+        return bookService.decrementAvailableCopies(resolveBookId(copyBookId));
+    }
+
+    @Override
+    @Transactional
+    public void incrementAvailableByCopyBook(Long copyBookId) {
+        bookService.incrementAvailableCopies(resolveBookId(copyBookId));
+    }
+
+    private Long resolveBookId(Long copyBookId) {
+        return copyBookRepository.findById(copyBookId)
+                .map(copyBook -> copyBook.getBook() != null ? copyBook.getBook().getId() : null)
+                .orElseThrow(() -> new BusinessException("CopyBook not found with id: " + copyBookId));
     }
 }
 

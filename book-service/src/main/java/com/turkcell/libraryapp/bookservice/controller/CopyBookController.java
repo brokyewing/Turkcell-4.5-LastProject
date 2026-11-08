@@ -41,6 +41,19 @@ public class CopyBookController {
         return copyBookService.isAvailable(id);
     }
 
+    // loan-service kopya ID'siyle çalışır (kitap ID'sini bilmez): stok düşme/artırma
+    // kopya üzerinden yapılır, book-service kopyanın kitabını çözer.
+    @PostMapping("/{id}/decrement")
+    public Boolean decrementAvailable(@PathVariable Long id) {
+        return copyBookService.decrementAvailableByCopyBook(id);
+    }
+
+    @PostMapping("/{id}/increment")
+    public Boolean incrementAvailable(@PathVariable Long id) {
+        copyBookService.incrementAvailableByCopyBook(id);
+        return true;
+    }
+
     @PostMapping
     public ResponseEntity<CopyBookResponseDto> createCopyBook(@RequestBody CopyBook copyBook) {
         CopyBook created = copyBookService.createCopyBook(copyBook);

@@ -12,6 +12,12 @@ public interface CopyBookService {
     boolean existsById(Long id);
     boolean isAvailable(Long id);
     List<CopyBook> getCopyBooksByBookId(Long bookId);
+
+    /** Kopyanın bağlı olduğu kitabın stoğunu 1 azaltır. false → stok yok. */
+    boolean decrementAvailableByCopyBook(Long copyBookId);
+
+    /** Kopyanın bağlı olduğu kitabın stoğunu 1 artırır (iade). */
+    void incrementAvailableByCopyBook(Long copyBookId);
 }
 
 

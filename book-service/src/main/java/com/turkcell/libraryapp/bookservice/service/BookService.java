@@ -22,6 +22,16 @@ public interface BookService {
     List<Book> findBooksByAuthor(String author);
     List<Book> findBooksWithAvailableCopies();
     Page<Book> getAllBooks(Pageable pageable);
+
+    /**
+     * Kitabın stoğunu 1 azaltır.
+     * @return true → stok düştü; false → stok zaten 0 (kitap var ama müsait kopya yok)
+     * @throws com.turkcell.libraryapp.bookservice.exception.BusinessException kitap hiç yoksa
+     */
+    boolean decrementAvailableCopies(Long bookId);
+
+    /** Kitabın stoğunu 1 artırır (iade). Kitap yoksa BusinessException. */
+    void incrementAvailableCopies(Long bookId);
 }
 
 
