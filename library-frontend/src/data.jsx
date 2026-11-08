@@ -19,7 +19,10 @@ export function DataProvider({ children }) {
     try {
       // Üç isteği paralel at — birbirini beklemesine gerek yok
       const [b, a, c] = await Promise.all([api.getBooks(), api.getAuthors(), api.getCategories()])
-      setBooks(b); setAuthors(a); setCategories(c)
+      // /api/books Spring Page döner ({content:[...]}); books.reduce/.length bozulmasın diye diziye indir.
+      setBooks(Array.isArray(b) ? b : (b?.content ?? []))
+      setAuthors(Array.isArray(a) ? a : (a?.content ?? []))
+      setCategories(Array.isArray(c) ? c : (c?.content ?? []))
     } catch (e) {
       setError(e.message)
     } finally {

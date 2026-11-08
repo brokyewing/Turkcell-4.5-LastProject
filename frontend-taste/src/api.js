@@ -12,7 +12,10 @@ export function getToken() { return token }
 export function decodeToken() {
   if (!token) return null
   try {
-    const payload = JSON.parse(atob(token.split('.')[1]))
+    // JWT base64url kodludur: '-' → '+', '_' → '/' ve '=' dolgusu gerekir.
+    const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
+    const payload = JSON.parse(atob(pad))
     return { studentId: payload.studentId, name: payload.name, sub: payload.sub }
   } catch {
     return null
@@ -26,6 +29,8 @@ async function request(path, options = {}) {
   const res = await fetch(`/api${path}`, { ...options, headers })
   if (res.status === 401) {
     setToken(null)
+    // Token temizlendi; App.jsx dinleyip oturumu kapatıyor (login ekranına dönüş).
+    window.dispatchEvent(new Event('auth:logout'))
     throw new Error('Oturum geçersiz. Lütfen tekrar giriş yapın.')
   }
   if (!res.ok) {
@@ -37,14 +42,21 @@ async function request(path, options = {}) {
   return text ? JSON.parse(text) : null
 }
 
+// /api/books Spring Page döner ({content:[...]}) — tek yerde diziye indir.
+function toList(data) {
+  if (Array.isArray(data)) return data
+  return data?.content ?? []
+}
+
 export const api = {
   login: (studentNumber, password) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ studentNumber, password }) }),
 
   // Ortak
-  getBooks: () => request('/books'),
+  getBooks: async () => toList(await request('/books?size=500')),
   getAuthors: () => request('/authors'),
   getCategories: () => request('/categories'),
+  getCopyBooks: () => request('/copybooks'),
   createAuthor: (a) => request('/authors', { method: 'POST', body: JSON.stringify(a) }),
   createCategory: (c) => request('/categories', { method: 'POST', body: JSON.stringify(c) }),
   createBook: (b) => request('/books', { method: 'POST', body: JSON.stringify(b) }),
@@ -56,4 +68,7 @@ export const api = {
 
   // Üye
   getMyLoans: (studentId) => request(`/loans/members/${studentId}`),
+  createLoan: (body) => request('/loans', { method: 'POST', body: JSON.stringify(body) }),
+  returnLoan: (loanId) => request('/loans/return', { method: 'POST', body: JSON.stringify({ loanId }) }),
+  getMyFinesTotal: (studentId) => request(`/fines/students/${studentId}/total`),
 }
