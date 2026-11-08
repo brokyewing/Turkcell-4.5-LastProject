@@ -19,7 +19,9 @@ public class Student {
     private String lastname;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "departmantid", nullable = false)
+    // nullable: kendi kendine kayıt olan öğrenci bölüm seçemez (departments listesi auth arkasında),
+    // bölüm ataması sonradan yönetici tarafından yapılır.
+    @JoinColumn(name = "departmantid", nullable = true)
     private Department department;
     
     // WRITE_ONLY: gelen JSON'dan OKUNUR (kayıt/giriş) ama yanıtta ASLA yazılmaz.
