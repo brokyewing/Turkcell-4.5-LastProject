@@ -5,19 +5,37 @@ import { api } from './api'
 export default function UserView({ me }) {
   const [books, setBooks] = useState([])
   const [loans, setLoans] = useState([])
+  const [copies, setCopies] = useState([])
+  const [busyCopyIds, setBusyCopyIds] = useState(() => new Set())
+  const [finesTotal, setFinesTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [msg, setMsg] = useState(null)
+  const [reloadKey, setReloadKey] = useState(0)
+
+  // Ödünç alma formu: { book, copyId, due }
+  const [borrow, setBorrow] = useState(null)
+  const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let alive = true
     ;(async () => {
       setLoading(true); setError(null)
       try {
-        const [b, l] = await Promise.all([
+        const [b, l, c, allLoans, f] = await Promise.all([
           api.getBooks(),
           me.studentId ? api.getMyLoans(me.studentId).catch(() => []) : Promise.resolve([]),
+          api.getCopyBooks().catch(() => []),
+          api.getLoans().catch(() => []),
+          me.studentId ? api.getMyFinesTotal(me.studentId).catch(() => 0) : Promise.resolve(0),
         ])
-        if (alive) { setBooks(b); setLoans(l || []) }
+        if (!alive) return
+        setBooks(b)
+        setLoans(l || [])
+        setCopies(c || [])
+        // Aynı kopya aynı anda iki kez ödünç verilemez; açık ödünçteki kopyaları işaretle.
+        setBusyCopyIds(new Set((allLoans || []).filter((x) => !x.isReturned).map((x) => x.copyBookId)))
+        setFinesTotal(Number(f) || 0)
       } catch (e) {
         if (alive) setError(e.message)
       } finally {
@@ -25,9 +43,58 @@ export default function UserView({ me }) {
       }
     })()
     return () => { alive = false }
-  }, [me.studentId])
+  }, [me.studentId, reloadKey])
 
   const openLoans = loans.filter((l) => !l.isReturned)
+
+  function freeCopies(bookId) {
+    return copies.filter((c) => c.bookId === bookId && !busyCopyIds.has(c.id))
+  }
+
+  function startBorrow(book) {
+    setMsg(null)
+    const free = freeCopies(book.id)
+    if (free.length === 0) {
+      setMsg({ err: true, text: `"${book.title}" için ödünç verilebilir kopya yok.` })
+      return
+    }
+    setBorrow({ book, copyId: String(free[0].id), due: isoDate(addDays(new Date(), 14)) })
+  }
+
+  async function confirmBorrow(e) {
+    e.preventDefault()
+    if (!borrow) return
+    setBusy(true); setMsg(null)
+    try {
+      await api.createLoan({
+        studentId: Number(me.studentId),
+        copyBookId: Number(borrow.copyId),
+        dueDate: `${borrow.due}T00:00:00`,
+      })
+      setMsg({ text: `"${borrow.book.title}" ödünç alındı. İade: ${fmt(borrow.due)}.` })
+      setBorrow(null)
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      setMsg({ err: true, text: e.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function returnLoan(loanId) {
+    setBusy(true); setMsg(null)
+    try {
+      await api.returnLoan(loanId)
+      setMsg({ text: `Ödünç #${loanId} iade edildi.` })
+      setReloadKey((k) => k + 1)
+    } catch (e) {
+      setMsg({ err: true, text: e.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const borrowFree = borrow ? freeCopies(borrow.book.id) : []
 
   return (
     <div className="page">
@@ -36,10 +103,43 @@ export default function UserView({ me }) {
           <h1>Merhaba, {me.name || 'okur'}.</h1>
           <p>Bugün ne okumak istersin?</p>
         </div>
-        <div className="badge warn">{openLoans.length} açık ödünç</div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="badge warn">Toplam ceza: {fmtMoney(finesTotal)} TL</div>
+          <div className="badge warn">{openLoans.length} açık ödünç</div>
+        </div>
       </div>
 
       {error && <div className="state err">Hata: {error}</div>}
+      {msg && (
+        <div className={`state ${msg.err ? 'err' : ''}`} role="status" style={msg.err ? undefined : { color: 'var(--ok)' }}>
+          {msg.text}
+        </div>
+      )}
+
+      {borrow && (
+        <div className="panel rise" style={{ marginBottom: 22 }}>
+          <div className="panel-h"><h2>Ödünç Al · {borrow.book.title}</h2></div>
+          <div className="panel-b" style={{ padding: 16 }}>
+            <form onSubmit={confirmBorrow} style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ flex: '1 1 220px' }}>
+                <label htmlFor="copy-select">Kopya</label>
+                <select id="copy-select" value={borrow.copyId} onChange={(e) => setBorrow({ ...borrow, copyId: e.target.value })}>
+                  {borrowFree.map((c) => <option key={c.id} value={c.id}>Kopya #{c.id}</option>)}
+                </select>
+              </div>
+              <div style={{ flex: '1 1 180px' }}>
+                <label htmlFor="due-date">İade tarihi</label>
+                <input id="due-date" type="date" value={borrow.due} min={isoDate(new Date())}
+                  onChange={(e) => setBorrow({ ...borrow, due: e.target.value })} required />
+              </div>
+              <button className="btn primary" type="submit" disabled={busy}>
+                {busy ? <><span className="spinner" /> Alınıyor…</> : 'Onayla'}
+              </button>
+              <button className="btn line" type="button" disabled={busy} onClick={() => setBorrow(null)}>Vazgeç</button>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Kitaplarım */}
       <section style={{ marginBottom: 30 }}>
@@ -51,17 +151,23 @@ export default function UserView({ me }) {
         ) : (
           <div className="panel"><div className="panel-b"><div className="tw">
             <table>
-              <thead><tr><th>Ödünç #</th><th>İade tarihi</th><th>Durum</th></tr></thead>
+              <thead><tr><th>Ödünç #</th><th>Kopya</th><th>İade tarihi</th><th>Durum</th><th>İşlem</th></tr></thead>
               <tbody>
                 {openLoans.map((l) => {
                   const overdue = l.dueDate && new Date(l.dueDate) < new Date()
                   return (
                     <tr key={l.id}>
                       <td className="num">{l.id}</td>
+                      <td className="num">{l.copyBookId}</td>
                       <td>{fmt(l.dueDate)}</td>
                       <td>{overdue
                         ? <span className="badge dan">Gecikmiş</span>
                         : <span className="badge ok">Zamanında</span>}</td>
+                      <td>
+                        <button className="btn line sm" disabled={busy} onClick={() => returnLoan(l.id)}>
+                          İade Et
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}
@@ -80,25 +186,50 @@ export default function UserView({ me }) {
           <div className="panel"><div className="state">Katalogda henüz kitap yok.</div></div>
         ) : (
           <div className="books">
-            {books.map((b, i) => (
-              <div className="book rise" key={b.id} style={{ animationDelay: `${i * 0.03}s` }}>
-                <div className={`cover c${b.id % 6}`}><b>{b.title}</b></div>
-                <div className="meta">
-                  <div className="t">{b.title}</div>
-                  <div className="a">{b.authorName} {b.authorLastname}</div>
-                  <div className="st">
-                    {b.availableCopies > 0
-                      ? <span className="badge ok">{b.availableCopies} müsait</span>
-                      : <span className="badge dan">Tükendi</span>}
+            {books.map((b, i) => {
+              const hasFree = freeCopies(b.id).length > 0
+              return (
+                <div className="book rise" key={b.id} style={{ animationDelay: `${i * 0.03}s` }}>
+                  <div className={`cover c${b.id % 6}`}><b>{b.title}</b></div>
+                  <div className="meta">
+                    <div className="t">{b.title}</div>
+                    <div className="a">{b.authorName} {b.authorLastname}</div>
+                    <div className="st">
+                      {b.availableCopies > 0
+                        ? <span className="badge ok">{b.availableCopies} müsait</span>
+                        : <span className="badge dan">Tükendi</span>}
+                    </div>
+                    <button className="btn line sm" style={{ marginTop: 9, width: '100%', justifyContent: 'center' }}
+                      disabled={b.availableCopies <= 0 || !hasFree || busy}
+                      onClick={() => startBorrow(b)}>
+                      Ödünç Al
+                    </button>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
     </div>
   )
+}
+
+function addDays(d, n) {
+  const x = new Date(d)
+  x.setDate(x.getDate() + n)
+  return x
+}
+
+function isoDate(d) {
+  const x = new Date(d)
+  const p = (n) => String(n).padStart(2, '0')
+  return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`
+}
+
+function fmtMoney(n) {
+  const v = Number(n) || 0
+  return v.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function fmt(d) {

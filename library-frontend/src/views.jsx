@@ -151,9 +151,17 @@ function BookForm({ authors, categories, onDone, onError }) {
   const [submitting, setSubmitting] = useState(false)
   const [touched, setTouched] = useState(false)
   const set = (k) => (e) => setForm({ ...form, [k]: e.target.value })
+  // Toplam kopya değişince müsait kopya da onunla eşitlenir (varsayılan).
+  const setTotal = (e) => {
+    const v = e.target.value
+    setForm({ ...form, totalCopies: v, availableCopies: v })
+  }
+  // Backend availableCopies için @Positive; 0 veya boş kabul edilmez.
+  const setAvailable = (e) => setForm({ ...form, availableCopies: Math.max(1, Number(e.target.value) || 1) })
 
   const isbnValid = /^[0-9]{13}$/.test(form.isbn)
-  const canSubmit = form.title && isbnValid && form.authorId && form.categoryId && authors.length && categories.length
+  const canSubmit = form.title && isbnValid && form.authorId && form.categoryId &&
+    Number(form.totalCopies) >= 1 && Number(form.availableCopies) >= 1 && authors.length && categories.length
 
   async function submit(e) {
     e.preventDefault()
@@ -203,10 +211,10 @@ function BookForm({ authors, categories, onDone, onError }) {
           </select>
         </Field>
         <Field label="Toplam kopya" required>
-          <input type="number" min="1" value={form.totalCopies} onChange={set('totalCopies')} />
+          <input type="number" min="1" value={form.totalCopies} onChange={setTotal} />
         </Field>
-        <Field label="Mevcut kopya" required>
-          <input type="number" min="0" value={form.availableCopies} onChange={set('availableCopies')} />
+        <Field label="Mevcut kopya" required hint="En az 1 olmalı">
+          <input type="number" min="1" value={form.availableCopies} onChange={setAvailable} />
         </Field>
       </div>
       <div className="form-actions">

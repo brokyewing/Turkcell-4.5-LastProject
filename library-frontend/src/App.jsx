@@ -3,6 +3,7 @@ import { DataProvider, useData } from './data'
 import { ToastProvider } from './ui'
 import { Icon } from './icons'
 import { Dashboard, BooksView, AuthorsView, CategoriesView } from './views'
+import { api, setToken, isAuthed } from './api'
 
 const NAV = [
   { key: 'dashboard', label: 'Genel Bakış', icon: Icon.Dashboard },
@@ -54,7 +55,7 @@ function Sidebar({ active, onNav }) {
   )
 }
 
-function Shell() {
+function Shell({ onLogout }) {
   const [active, setActive] = useState('dashboard')
   const [theme, toggleTheme] = useTheme()
   const [title, sub] = TITLES[active]
@@ -68,9 +69,12 @@ function Shell() {
             <h1>{title}</h1>
             <div className="sub">{sub}</div>
           </div>
-          <button className="btn icon" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'} title="Tema değiştir">
-            {theme === 'dark' ? <Icon.Sun size={18} /> : <Icon.Moon size={18} />}
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn ghost" onClick={onLogout} title="Oturumu kapat">Çıkış</button>
+            <button className="btn icon" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Açık moda geç' : 'Koyu moda geç'} title="Tema değiştir">
+              {theme === 'dark' ? <Icon.Sun size={18} /> : <Icon.Moon size={18} />}
+            </button>
+          </div>
         </header>
         <div className="content">
           {active === 'dashboard' && <Dashboard />}
@@ -84,11 +88,64 @@ function Shell() {
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(isAuthed())
+
+  if (!authed) return <Login onSuccess={() => setAuthed(true)} />
+
   return (
     <ToastProvider>
       <DataProvider>
-        <Shell />
+        <Shell onLogout={() => { setToken(null); setAuthed(false) }} />
       </DataProvider>
     </ToastProvider>
+  )
+}
+
+/* Basit login kapısı: token yoksa gösterilir. Demo: S1001 / pass123 */
+function Login({ onSuccess }) {
+  const [studentNumber, setStudentNumber] = useState('S1001')
+  const [password, setPassword] = useState('pass123')
+  const [error, setError] = useState(null)
+  const [loading, setLoading] = useState(false)
+
+  async function submit(e) {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await api.login(studentNumber, password)
+      setToken(res.token)
+      onSuccess()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="brand">
+          <span className="logo"><Icon.Book size={20} /></span>
+          <span>LibraryApp<small>Yönetim Paneli</small></span>
+        </div>
+        <form onSubmit={submit}>
+          <div className="field">
+            <label htmlFor="studentNumber">Öğrenci numarası</label>
+            <input id="studentNumber" value={studentNumber} onChange={(e) => setStudentNumber(e.target.value)} required autoFocus />
+          </div>
+          <div className="field">
+            <label htmlFor="password">Parola</label>
+            <input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          </div>
+          {error && <div className="state error" style={{ padding: 0, textAlign: 'left' }}>{error}</div>}
+          <button className="btn primary" type="submit" disabled={loading}>
+            {loading ? <><span className="spinner" /> Giriş yapılıyor…</> : 'Giriş yap'}
+          </button>
+        </form>
+        <p className="sub">Demo: S1001 / pass123</p>
+      </div>
+    </div>
   )
 }

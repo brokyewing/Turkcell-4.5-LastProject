@@ -37,14 +37,21 @@ async function request(path, options = {}) {
   return text ? JSON.parse(text) : null
 }
 
+// /api/books Spring Page döner ({content:[...]}) — tek yerde diziye indir.
+function toList(data) {
+  if (Array.isArray(data)) return data
+  return data?.content ?? []
+}
+
 export const api = {
   login: (studentNumber, password) =>
     request('/auth/login', { method: 'POST', body: JSON.stringify({ studentNumber, password }) }),
 
   // Ortak
-  getBooks: () => request('/books'),
+  getBooks: async () => toList(await request('/books?size=500')),
   getAuthors: () => request('/authors'),
   getCategories: () => request('/categories'),
+  getCopyBooks: () => request('/copybooks'),
   createAuthor: (a) => request('/authors', { method: 'POST', body: JSON.stringify(a) }),
   createCategory: (c) => request('/categories', { method: 'POST', body: JSON.stringify(c) }),
   createBook: (b) => request('/books', { method: 'POST', body: JSON.stringify(b) }),
@@ -56,4 +63,9 @@ export const api = {
 
   // Üye
   getMyLoans: (studentId) => request(`/loans/members/${studentId}`),
+  createLoan: (body) => request('/loans', { method: 'POST', body: JSON.stringify(body) }),
+  returnLoan: (loanId) => request('/loans/return', { method: 'POST', body: JSON.stringify({ loanId }) }),
+  getMyFinesTotal: (studentId) => request(`/fines/students/${studentId}/total`),
+  payFine: (fineId) => request(`/fines/${fineId}/pay`, { method: 'POST' }),
+  getReservations: () => request('/reservations'),
 }

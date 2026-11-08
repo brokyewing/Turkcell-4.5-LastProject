@@ -1,12 +1,40 @@
-// Tüm istekler /api ile başlar ve Vite proxy tarafından gateway'e (8080)
+// Tüm istekler /api ile başlar ve Vite proxy tarafından gateway'e (18090)
 // iletilir. Gateway de Eureka'ya sorup doğru mikroservise yönlendirir.
-// Yani frontend hangi servisin nerede olduğunu BİLMEZ — sadece gateway'i bilir.
+// JWT token localStorage'da tutulur; her korumalı isteğe Authorization eklenir.
+
+const TOKEN_KEY = 'library_token'
+
+let token = localStorage.getItem(TOKEN_KEY) || null
+
+export function setToken(t) {
+  token = t
+  if (t) localStorage.setItem(TOKEN_KEY, t)
+  else localStorage.removeItem(TOKEN_KEY)
+}
+
+export function getToken() {
+  return token || localStorage.getItem(TOKEN_KEY)
+}
+
+export function isAuthed() {
+  return !!getToken()
+}
 
 async function request(path, options = {}) {
-  const res = await fetch(`/api${path}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  })
+  const current = getToken()
+  if (!current && path !== '/auth/login') {
+    throw new Error('Giriş yapmanız gerekiyor.')
+  }
+
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
+  if (current) headers.Authorization = `Bearer ${current}`
+
+  const res = await fetch(`/api${path}`, { ...options, headers })
+
+  if (res.status === 401) {
+    setToken(null)
+    throw new Error('Oturum geçersiz veya yetkiniz yok. Lütfen tekrar giriş yapın.')
+  }
   if (!res.ok) {
     // Backend'in GlobalExceptionHandler'ı hata gövdesi döndürüyor; onu okumaya çalış.
     let message = `HTTP ${res.status}`
@@ -24,8 +52,12 @@ async function request(path, options = {}) {
 }
 
 export const api = {
+  // Kimlik
+  login: (studentNumber, password) =>
+    request('/auth/login', { method: 'POST', body: JSON.stringify({ studentNumber, password }) }),
+
   // Kitaplar
-  getBooks: () => request('/books'),
+  getBooks: () => request('/books?size=500'),
   createBook: (book) => request('/books', { method: 'POST', body: JSON.stringify(book) }),
 
   // Yazarlar
