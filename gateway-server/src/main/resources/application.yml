@@ -33,7 +33,7 @@ spring:
           lower-case-service-id: true
 
 jwt:
-  secret: ${JWT_SECRET:library-app-super-secret-key-change-in-production-please-256bit!!}
+  secret: ${JWT_SECRET}
 
 eureka:
   client:
