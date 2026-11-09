@@ -2,6 +2,7 @@ package com.turkcell.libraryapp.memberservice.entity;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.turkcell.libraryapp.memberservice.enums.MembershipLevel;
+import com.turkcell.libraryapp.memberservice.enums.Role;
 import jakarta.persistence.*;
 import java.util.List;
 
@@ -41,6 +42,12 @@ public class Student {
     @Enumerated(EnumType.STRING)
     @Column(name = "membership_level", nullable = false)
     private MembershipLevel membershipLevel = MembershipLevel.STANDARD;
+
+    // Yetki rolü (STUDENT/LIBRARIAN). Kayıt ucuyla gelen herkes varsayılan STUDENT olur;
+    // yalnızca seed'deki kütüphaneci LIBRARIAN olarak oluşturulur.
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false)
+    private Role role = Role.STUDENT;
     
     public Student() {}
     
@@ -63,6 +70,8 @@ public class Student {
     public void setPhone(String phone) { this.phone = phone; }
     public MembershipLevel getMembershipLevel() { return membershipLevel; }
     public void setMembershipLevel(MembershipLevel membershipLevel) { this.membershipLevel = membershipLevel; }
+    public Role getRole() { return role; }
+    public void setRole(Role role) { this.role = role; }
 }
 
 
