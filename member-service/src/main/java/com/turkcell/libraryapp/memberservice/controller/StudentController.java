@@ -3,6 +3,7 @@ package com.turkcell.libraryapp.memberservice.controller;
 import com.turkcell.libraryapp.memberservice.dto.StudentCreateRequest;
 import com.turkcell.libraryapp.memberservice.dto.StudentResponseDto;
 import com.turkcell.libraryapp.memberservice.entity.Student;
+import com.turkcell.libraryapp.memberservice.security.IdentityGuard;
 import com.turkcell.libraryapp.memberservice.service.StudentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,9 +18,11 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class StudentController {
     private final StudentService studentService;
+    private final IdentityGuard identityGuard;
 
     @GetMapping
     public List<StudentResponseDto> getAllStudents() {
+        identityGuard.requireLibrarian();
         return studentService.getAllStudents().stream()
                 .map(StudentResponseDto::from)
                 .collect(Collectors.toList());
@@ -27,6 +30,7 @@ public class StudentController {
 
     @GetMapping("/{id}")
     public ResponseEntity<StudentResponseDto> getStudentById(@PathVariable Long id) {
+        identityGuard.requireSelf(id);
         return studentService.getStudentById(id)
                 .map(s -> ResponseEntity.ok(StudentResponseDto.from(s)))
                 .orElse(ResponseEntity.notFound().build());
@@ -46,11 +50,13 @@ public class StudentController {
 
     @PutMapping("/{id}")
     public ResponseEntity<StudentResponseDto> updateStudent(@PathVariable Long id, @RequestBody Student student) {
+        identityGuard.requireLibrarian();
         return ResponseEntity.ok(StudentResponseDto.from(studentService.updateStudent(id, student)));
     }
 
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteStudent(@PathVariable Long id) {
+        identityGuard.requireLibrarian();
         studentService.deleteStudent(id);
         return ResponseEntity.ok().build();
     }

@@ -30,6 +30,11 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(details);
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ExceptionDetails> handleForbiddenException(ForbiddenException e) {
+        ExceptionDetails details = new ExceptionDetails(e.getMessage());
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(details);
+    }
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ExceptionDetails> handleGenericException(Exception e) {
         ExceptionDetails details = new ExceptionDetails("An error occurred: " + e.getMessage());

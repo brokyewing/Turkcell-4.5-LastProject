@@ -2,6 +2,7 @@ package com.turkcell.libraryapp.loanservice.controller;
 
 import com.turkcell.libraryapp.loanservice.dto.response.LoanResponseDto;
 import com.turkcell.libraryapp.loanservice.entity.Loan;
+import com.turkcell.libraryapp.loanservice.security.IdentityGuard;
 import com.turkcell.libraryapp.loanservice.service.LoanService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -16,9 +17,11 @@ import java.util.stream.Collectors;
 public class BorrowController {
 
     private final LoanService loanService;
+    private final IdentityGuard identityGuard;
 
     @GetMapping("/me/{studentId}")
     public List<LoanResponseDto> getMyLoans(@PathVariable Long studentId) {
+        identityGuard.requireSelf(studentId);
         List<Loan> loans = loanService.findLoansByMemberId(studentId);
         return loans.stream()
                 .map(loan -> {

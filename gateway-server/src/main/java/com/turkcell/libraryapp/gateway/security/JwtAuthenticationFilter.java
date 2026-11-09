@@ -57,6 +57,18 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private static final Pattern STUDENT_POST_RESERVATION_CANCEL =
             Pattern.compile("^/api/reservations/[^/]+/cancel$");
 
+    // GET /api/students/{id} — TEK segment. /api/students/{id}/exists (Feign, iç çağrı)
+    // bu desene UYMAZ; öğrenciye açılmaz.
+    private static final Pattern STUDENT_GET_STUDENT =
+            Pattern.compile("^/api/students/([^/]+)$");
+
+    // Path'teki id, token'daki studentId claim'ine eşit olması gereken desenler (STUDENT için).
+    private static final List<Pattern> STUDENT_OWN_ID_PATHS = List.of(
+            STUDENT_GET_STUDENT,
+            Pattern.compile("^/api/loans/members/([^/]+)$"),
+            Pattern.compile("^/api/borrow/me/([^/]+)$"),
+            Pattern.compile("^/api/fines/students/([^/]+)/total$"));
+
     private final SecretKey key;
 
     public JwtAuthenticationFilter(@Value("${jwt.secret}") String secret) {
@@ -97,8 +109,14 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         Object roleClaim = claims.get("role");
         String role = roleClaim instanceof String value && !value.isBlank() ? value : ROLE_STUDENT;
 
-        if (!ROLE_LIBRARIAN.equals(role) && !isStudentAllowed(method, path)) {
-            return error(exchange, HttpStatus.FORBIDDEN, "Access denied for role " + role);
+        if (!ROLE_LIBRARIAN.equals(role)) {
+            if (!isStudentAllowed(method, path)) {
+                return error(exchange, HttpStatus.FORBIDDEN, "Access denied for role " + role);
+            }
+            // Allow-list geçti; şimdi path'teki {id} gerçekten bu öğrenciye mi ait?
+            if (!isStudentOwnPath(path, claims)) {
+                return error(exchange, HttpStatus.FORBIDDEN, "Access denied: not your resource");
+            }
         }
 
         return chain.filter(withTrustedIdentity(exchange, claims, role));
@@ -129,8 +147,9 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private boolean isStudentAllowed(HttpMethod method, String path) {
         if (HttpMethod.GET.equals(method)) {
             return STUDENT_GET_CATALOG_PATHS.stream().anyMatch(root -> matchesPrefix(path, root))
-                    // /api/students/{id} — detay serbest, tam /api/students (liste) YASAK.
-                    || path.startsWith("/api/students/")
+                    // /api/students/{id} — detay serbest; /api/students (liste) ve
+                    // /api/students/{id}/exists YASAK.
+                    || STUDENT_GET_STUDENT.matcher(path).matches()
                     || matchesPrefix(path, "/api/loans/members")
                     || matchesPrefix(path, "/api/borrow/me")
                     || STUDENT_GET_FINE_TOTAL.matcher(path).matches()
@@ -143,6 +162,44 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                     || STUDENT_POST_RESERVATION_CANCEL.matcher(path).matches();
         }
         return false;
+    }
+
+    /**
+     * Path'te öğrenci id'si taşıyan uçlarda, path id'si token'daki studentId claim'ine eşit olmalı.
+     * Id taşımayan uçlar (katalog, POST gövde) burada kontrol edilmez; gövde sahipliği servis katmanında.
+     * claim yoksa ya da parse edilemiyorsa → erişim yok (ID'siz STUDENT token'ı bu yollara giremez).
+     */
+    private boolean isStudentOwnPath(String path, Claims claims) {
+        for (Pattern pattern : STUDENT_OWN_ID_PATHS) {
+            java.util.regex.Matcher matcher = pattern.matcher(path);
+            if (matcher.matches()) {
+                Long claimStudentId = claimStudentId(claims);
+                if (claimStudentId == null) {
+                    return false;
+                }
+                try {
+                    return claimStudentId.equals(Long.valueOf(matcher.group(1)));
+                } catch (NumberFormatException e) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    private Long claimStudentId(Claims claims) {
+        Object claim = claims.get("studentId");
+        if (claim instanceof Number number) {
+            return number.longValue();
+        }
+        if (claim instanceof String value && !value.isBlank()) {
+            try {
+                return Long.valueOf(value.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+        return null;
     }
 
     /** path ya kökün kendisi ya da kökün altındaki bir yol olmalı (/api/books, /api/books/5). */
