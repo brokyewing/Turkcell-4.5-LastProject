@@ -1,7 +1,8 @@
 # Proje — Kitaplık (Turkcell 4.5 Bitirme — LastProject)
 
-**Durum:** geliştirme — kod var, ürün çalışmıyor (kimse giriş yapamıyor, book-service açılmıyor)
-**Tarih:** 2026-11-08
+**Durum:** çalışıyor — 11/11 konteyner healthy; yetkilendirme + ödünç/iade/ceza zinciri canlı doğrulandı.
+Açık: IDOR (sahiplik kontrolü), CORS, tarayıcı E2E, iki kullanıcı kararı.
+**Tarih:** 2026-11-09
 **Yol:** `C:\Users\asker\Projelerim\Turkcell-egitimi\04-bitirme\LibraryApp-Last`
 **Depo:** https://github.com/brokyewing/Turkcell-4.5-LastProject (branch `main`, public)
 **Üst proje:** `Turkcell-egitimi` (bu, onun içindeki bitirme teslimi — ayrı beyin)
@@ -27,53 +28,68 @@ Config + 5 iş servisi), PostgreSQL, Redis (cache), Kafka (yalnız `loan.returne
 - Bildirim (e-posta/SMS), ödeme entegrasyonu (ceza ödemesi yalnız durum değişimi)
 - Kütüphaneci onay akışı, çok şubeli yapı
 
-## Ölçülen durum (2026-11-08, bu dizinde)
+## Ölçülen durum (2026-11-09, A1–A4 sonrası)
 
-### Derleme
-| Modül | Sonuç |
+### Derleme ve testler — hepsi yeşil
+| Modül | Test |
 |---|---|
-| discovery, gateway, book, member, loan, reservation, fine | `mvn -DskipTests package` OK |
-| **config-server** | **DERLENMİYOR** — `ConfigServerApplication.java:6` `EnableEurekaClient` bulunamıyor (Spring Cloud 2025.0.3'ten kaldırıldı) |
+| book | 6 |
+| loan | 15 |
+| fine | 6 |
+| reservation | 7 |
+| member | 3 |
+| gateway | 10 |
+| config-server, discovery-server | paket rc=0 (test yok) |
 
-### Çalışma zamanı (postgres+redis+kafka ayağa kaldırılıp denendi)
+### Çalışma zamanı (gerçek konteynerler, `kitaplik` projesi, override-a4)
 | Deneme | Sonuç |
 |---|---|
-| `book-service` başlatma | **FAILED** — `jpaAuditingHandler` bean çakışması (`BookServiceApplication.java:10` + `config/JpaConfig.java:11` ikisi de `@EnableJpaAuditing`) |
-| DB tabloları | yalnız 5: `students`, `deparmants`, `fines`, `reservations`, `studentcopybookloan` — **`books`/`authors`/`book_categories`/`copybooks` yok** |
-| `GET /api/books` (tokensuz, gateway) | 401 ✓ beklenen |
-| `POST /api/auth/login` (`S1001/pass123`) | 400 `Invalid credentials`; `students` tablosu **0 satır** (seed yok) |
-| `POST /api/students` (tokensuz) | 401 → kayıt ucu token istiyor, giriş yapacak kullanıcı yok (**kilitli döngü**) |
-| `GET /actuator/health` (gateway) | 200 ✓ |
-| loan-service testleri | 9/9 PASS |
-| book-service testi (Testcontainers) | Docker erişimi yoksa hata — CI'da Docker var, lokalde kırılgan |
+| `docker compose up -d --build` | **11/11 healthy** |
+| login `S1001/pass123` | 200 + JWT, `role=STUDENT` |
+| login `L1001` / `DEMO_LIBRARIAN_PASSWORD` | 200 + JWT, `role=LIBRARIAN` |
+| tokensuz `GET /api/books` / `/api/students` / `DELETE /api/books/1` | **401** |
+| STUDENT: `GET /api/books` | 200 |
+| STUDENT: `GET /api/students`, `DELETE/POST /api/books`, `GET /api/fines` | **403** |
+| LIBRARIAN: `GET /api/students`, `GET /api/fines` | 200 |
+| STUDENT + `X-Role: LIBRARIAN` spoof | hâlâ **403** |
+| ödünç → iade | stok 2 → 1 → 2 |
+| 10 gün gecikmeli iade | **50.0 TL** `LATE_RETURN` (5 TL/gün), Kafka→fine |
+| Flyway | dolu DB: `Schema is up to date`; taze DB: her servis kendi V1'ini çalıştırır |
+
+### Bilinen açıklar (ölçülmüş)
+- **IDOR:** gateway `X-Student-Id` taşıyor ama servisler okumuyor → STUDENT `GET /api/students/{başkası}`,
+  `GET /api/loans/members/{başkası}`, `POST /api/loans {studentId: başkası}` yapabiliyor.
+- **CORS yok:** gateway'de CORS/`globalcors` tanımı yok; tarayıcı preflight'ı 403.
+- **Frontend `role` kullanmıyor:** `App.jsx` herkese kütüphaneci sekmesini gösteriyor.
 
 ### Ön yüz
-- `library-frontend/src/api.js:7` hiç `Authorization` başlığı göndermiyor → gateway tüm ekranları 401'ler
-- `library-frontend/src/data.jsx:21` `Page` gövdesini dizi sanıyor; `views.jsx:14` `books.reduce` → çalışma anında TypeError
-- `frontend-taste` login + token taşıyor (daha ürün gibi) ama demo kullanıcı (`App.jsx:35`) hiç seed edilmiyor; ödünç/iade/ceza aksiyonu yok
+- `frontend-taste` gerçek API'ye bağlı (Page→dizi, kopya seçimi, ödünç/iade, ödenmemiş ceza toplamı); proxy 18090.
+- `library-frontend` admin iskeleti: login + Page düzeltmesi yapıldı.
 
 ## Gereklilikler
 | # | Gereklilik | Öncelik | Durum |
 |---|---|---|---|
-| G1 | `docker compose up` sonrası `POST /api/auth/login` 200 döner (seed'li kullanıcı) | yüksek | yok |
-| G2 | book-service açılır, `books`/`copybooks` tabloları oluşur | yüksek | yok |
-| G3 | Tarayıcıda login → kitap listesi → ödünç al → iade et akışı çalışır | yüksek | yok |
-| G4 | Ödünçte stok düşer, iadede artar; aynı kopya iki kez verilemez | yüksek | yok |
-| G5 | Rezervasyon fulfill + süre dolma akışı çalışır | orta | yok |
-| G6 | Yetkilendirme: öğrenci kitap silemez, üye listesini göremez | orta | yok |
-| G7 | config-server derlenir ve servisler config client olur (ya da servis tamamen kaldırılır) | orta | yok |
-| G8 | Flyway bağlanır, şema migration'dan kurulur (`ddl-auto` yerine) | orta | yok |
-| G9 | README/PROJE-HIKAYESI kodla çelişmez | düşük | yok |
+| G1 | `docker compose up` sonrası `POST /api/auth/login` 200 döner (seed'li kullanıcı) | yüksek | **✓** |
+| G2 | book-service açılır, `books`/`copybooks` tabloları oluşur | yüksek | **✓** |
+| G3 | Tarayıcıda login → kitap listesi → ödünç al → iade et akışı çalışır | yüksek | **~** (API ✓, CORS eksik) |
+| G4 | Ödünçte stok düşer, iadede artar; aynı kopya iki kez verilemez | yüksek | **✓** |
+| G5 | Rezervasyon fulfill + süre dolma akışı çalışır | orta | **✓** (7 test) |
+| G6 | Yetkilendirme: öğrenci kitap silemez, üye listesini göremez | orta | **✓** (IDOR hariç) |
+| G7 | config-server derlenir ve servisler config client olur (ya da servis tamamen kaldırılır) | orta | config derleniyor; `configurations/` **ölü** — karar bekliyor |
+| G8 | Flyway bağlanır, şema migration'dan kurulur (`ddl-auto` yerine) | orta | **✓** |
+| G9 | README/PROJE-HIKAYESI kodla çelişmez | düşük | kısmi |
 
 ## "Bitti" tanımı
-- `docker compose up -d --build` → 8 konteyner healthy
+- `docker compose up -d --build` → 11 konteyner healthy
 - `POST /api/auth/login` (seed kullanıcı) → 200 + token
 - Tokensuz `GET /api/books` → 401; tokenlı → 200 ve `content` dizisi
 - Tarayıcıda ödünç al + iade et akışı ekran görüntüsüyle doğrulanır
 - `mvn test` tüm modüllerde yeşil (Testcontainers dahil, Docker açıkken)
 
 ## Mimari kararlar
-- **Tek veritabanı, tek şema** — servis başına şema ayrımı yok. Kısa vadede kabul; Adım 4'te konuşulacak.
+- **Tek veritabanı, tek şema** — servis başına şema ayrımı yok; her servis kendi
+  `flyway_schema_history_<servis>` tablosunu kullanır, migration'lar idempotenttir (servis sırası bağımsız).
 - **Feign + Kafka birlikte:** katalog/üye doğrulaması senkron (Feign), ceza tetikleme asenkron (Kafka). Ayrım doğru.
-- **JWT'de rol yok** — gateway yalnız imza doğruluyor. Yetkilendirme G6'ya kadar yok sayılıyor.
+- **JWT'de rol var:** `role` claim (`STUDENT`/`LIBRARIAN`); gateway yol-rol allow-list uygular.
+  Downstream servisler henüz `X-Student-Id`'yi okumuyor → sahiplik (IDOR) kontrolü açık iş.
 - İki ön yüzden **`frontend-taste` ürün yüzeyi**, `library-frontend` demo/iskelet kabul edildi.
