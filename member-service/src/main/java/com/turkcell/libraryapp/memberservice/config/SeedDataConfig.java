@@ -6,6 +6,8 @@ import com.turkcell.libraryapp.memberservice.enums.MembershipLevel;
 import com.turkcell.libraryapp.memberservice.enums.Role;
 import com.turkcell.libraryapp.memberservice.repository.DepartmentRepository;
 import com.turkcell.libraryapp.memberservice.repository.StudentRepository;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -14,12 +16,18 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * Uygulama açıldığında demo kullanıcıları oluşturur:
- * S1001 / pass123 (STUDENT) ve L1001 / librarian123 (LIBRARIAN).
+ * S1001 / pass123 (STUDENT) ve L1001 / `demo.librarian-password` (LIBRARIAN).
  * Idempotent: her kullanıcı kendi numarasına göre kontrol edilir, var olan kayda dokunulmaz.
+ * Kütüphaneci parolası repoda tutulmaz: özellik tanımlı değilse kütüphaneci hiç seed edilmez.
  */
+@Slf4j
 @Configuration
 @Profile("!test")
 public class SeedDataConfig {
+
+    /** Demo kütüphaneci parolası; boşsa kütüphaneci seed atlanır. */
+    @Value("${demo.librarian-password:}")
+    private String librarianPassword;
 
     @Bean
     public CommandLineRunner seedMemberData(DepartmentRepository departmentRepository,
@@ -27,7 +35,11 @@ public class SeedDataConfig {
                                             PasswordEncoder passwordEncoder) {
         return args -> {
             seedStudent(studentRepository, departmentRepository, passwordEncoder);
-            seedLibrarian(studentRepository, departmentRepository, passwordEncoder);
+            if (librarianPassword == null || librarianPassword.isBlank()) {
+                log.info("demo.librarian-password tanimli degil, kutuphaneci seed atlandi");
+                return;
+            }
+            seedLibrarian(studentRepository, departmentRepository, passwordEncoder, librarianPassword);
         };
     }
 
@@ -58,7 +70,8 @@ public class SeedDataConfig {
     // Kütüphaneci: gateway'de LIBRARIAN rolüyle her yola erişebilir.
     private void seedLibrarian(StudentRepository studentRepository,
                                DepartmentRepository departmentRepository,
-                               PasswordEncoder passwordEncoder) {
+                               PasswordEncoder passwordEncoder,
+                               String password) {
         if (studentRepository.findByStudentNumber("L1001").isPresent()) {
             return;
         }
@@ -75,7 +88,7 @@ public class SeedDataConfig {
         librarian.setMembershipLevel(MembershipLevel.STANDARD);
         librarian.setRole(Role.LIBRARIAN);
         librarian.setDepartment(department);
-        librarian.setPassword(passwordEncoder.encode("librarian123"));
+        librarian.setPassword(passwordEncoder.encode(password));
         studentRepository.save(librarian);
     }
 }

@@ -155,6 +155,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
+      # Demo kutuphaneci seed'i icin parola. Bos birakilirsa kutuphaneci HIC seed edilmez.
+      - DEMO_LIBRARIAN_PASSWORD=${DEMO_LIBRARIAN_PASSWORD:-}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]

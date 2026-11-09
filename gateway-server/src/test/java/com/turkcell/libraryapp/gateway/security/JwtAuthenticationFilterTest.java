@@ -16,6 +16,7 @@ import reactor.core.publisher.Mono;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -142,10 +143,51 @@ class JwtAuthenticationFilterTest {
         assertEquals("STUDENT", forwardedHeaders.getFirst("X-Role"), "token'daki rol yazılmalı");
     }
 
+    // role claim'i String değilse (dizi) 500 yerine STUDENT davranışı: liste 403.
+    @Test
+    void roleClaimDiziIseStudentSayilir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/students")
+                        .header(HttpHeaders.AUTHORIZATION,
+                                "Bearer " + tokenWithRoleClaim(List.of("LIBRARIAN"), 7L))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    // role claim'i sayıysa da STUDENT: izinli yol geçer, X-Role STUDENT olarak iletilir.
+    @Test
+    void roleClaimSayiIseStudentSayilir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/books")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithRoleClaim(123, 7L))
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        assertEquals("STUDENT", forwarded.get().getRequest().getHeaders().getFirst("X-Role"));
+    }
+
     private MockServerWebExchange exchange(HttpMethod method, String path, String token) {
         return MockServerWebExchange.from(MockServerHttpRequest.method(method, path)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build());
+    }
+
+    private String tokenWithRoleClaim(Object roleClaim, Long studentId) {
+        Date now = new Date();
+        return Jwts.builder()
+                .subject("test-user")
+                .claim("studentId", studentId)
+                .claim("role", roleClaim)
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 60_000))
+                .signWith(key)
+                .compact();
     }
 
     private String token(String role, Long studentId) {

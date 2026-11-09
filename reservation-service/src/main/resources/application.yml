@@ -20,7 +20,7 @@ spring:
   flyway:
     enabled: true
     baseline-on-migrate: true
-    baseline-version: 1   # mevcut (dolu) DB'de V1 zaten uygulanmis sayilir; bos DB'de V1 calisir
+    baseline-version: 0   # 0 + idempotent V1: dolu DB'de V1 tekrar calisir ve zarar vermez; bos DB'de kurar
     # Aynı DB'yi 5 servis paylaşıyor; her servis kendi history tablosunu kullanır.
     table: flyway_schema_history_reservation
     locations: classpath:db/migration
