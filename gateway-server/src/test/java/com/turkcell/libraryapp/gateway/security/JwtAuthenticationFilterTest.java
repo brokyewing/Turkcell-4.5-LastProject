@@ -172,8 +172,105 @@ class JwtAuthenticationFilterTest {
         assertEquals("STUDENT", forwarded.get().getRequest().getHeaders().getFirst("X-Role"));
     }
 
-    private MockServerWebExchange exchange(HttpMethod method, String path, String token) {
-        return MockServerWebExchange.from(MockServerHttpRequest.method(method, path)
+    // ---- C2: path id'si öğrencinin kendisine ait olmalı ----
+
+    @Test
+    void studentBaskaOgrenciDetayi403Alir() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/students/2", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+        String body = exchange.getResponse().getBodyAsString().block();
+        assertNotNull(body);
+        assertTrue(body.contains("not your resource"), "gövde: " + body);
+    }
+
+    @Test
+    void studentKendiDetayiGecer() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/students/1", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void studentBaskaUyeOdencleri403Alir() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/loans/members/2", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void studentBaskaCezaToplami403Alir() {
+        MockServerWebExchange exchange =
+                exchange(HttpMethod.GET, "/api/fines/students/2/total", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void librarianBaskaOgrenciDetayiGecer() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/students/2", token("LIBRARIAN", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    // /api/students/{id}/exists Feign iç çağrısıdır; gateway'den öğrenciye açılmaz.
+    @Test
+    void studentStudentExistsYolu403Alir() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/students/1/exists", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    // studentId claim'i olmayan STUDENT token'ı id taşıyan yola giremez.
+    @Test
+    void studentIdClaimsizToken403Alir() {
+        Date now = new Date();
+        String tokenWithoutStudentId = Jwts.builder()
+                .subject("test-user")
+                .claim("role", "STUDENT")
+                .issuedAt(now)
+                .expiration(new Date(now.getTime() + 60_000))
+                .signWith(key)
+                .compact();
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/students/1")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer " + tokenWithoutStudentId)
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void studentKendiUyeOdencleriGecer() {
+        MockServerWebExchange exchange = exchange(HttpMethod.GET, "/api/loans/members/1", token("STUDENT", 1L));
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+    }
+
+    private MockServerWebExchange exchange(HttpMethod method, String path, String token) {        return MockServerWebExchange.from(MockServerHttpRequest.method(method, path)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build());
     }

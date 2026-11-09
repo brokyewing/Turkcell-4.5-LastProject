@@ -5,6 +5,7 @@ import com.turkcell.libraryapp.reservationservice.dto.response.ReservationRespon
 import com.turkcell.libraryapp.reservationservice.entity.Reservation;
 import com.turkcell.libraryapp.reservationservice.enums.ReservationStatus;
 import com.turkcell.libraryapp.reservationservice.exception.BusinessException;
+import com.turkcell.libraryapp.reservationservice.security.IdentityGuard;
 import com.turkcell.libraryapp.reservationservice.service.ReservationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +22,11 @@ import java.util.stream.Collectors;
 public class ReservationController {
 
     private final ReservationService reservationService;
+    private final IdentityGuard identityGuard;
 
     @PostMapping
     public ResponseEntity<ReservationResponseDto> createReservation(@Valid @RequestBody ReservationCreateRequest request) {
+        identityGuard.requireSelf(request.getStudentId());
         Reservation reservation = new Reservation();
         reservation.setStudentId(request.getStudentId());
         reservation.setCopyBookId(request.getCopyBookId());
@@ -41,6 +44,7 @@ public class ReservationController {
     public ResponseEntity<ReservationResponseDto> cancelReservation(@PathVariable Long id) {
         Reservation reservation = reservationService.getReservationById(id)
                 .orElseThrow(() -> new BusinessException("Reservation not found with id: " + id));
+        identityGuard.requireSelf(reservation.getStudentId());
         
         if (reservation.getStatus() != ReservationStatus.ACTIVE) {
             throw new BusinessException("Only active reservations can be cancelled");
@@ -55,6 +59,7 @@ public class ReservationController {
     @GetMapping("/{id}")
     public ResponseEntity<ReservationResponseDto> getReservationById(@PathVariable Long id) {
         Optional<Reservation> reservation = reservationService.getReservationById(id);
+        reservation.ifPresent(r -> identityGuard.requireSelf(r.getStudentId()));
         return reservation.map(r -> ResponseEntity.ok(mapToDto(r)))
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -63,6 +68,7 @@ public class ReservationController {
     public ResponseEntity<List<ReservationResponseDto>> getAllReservations(
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) String status) {
+        identityGuard.requireLibrarian();
         List<Reservation> reservations;
         if (studentId != null) {
             reservations = reservationService.findReservationsByStudentId(studentId);

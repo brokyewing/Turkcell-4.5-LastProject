@@ -5,6 +5,7 @@ import com.turkcell.libraryapp.loanservice.dto.request.LoanReturnRequest;
 import com.turkcell.libraryapp.loanservice.dto.response.LoanResponseDto;
 import com.turkcell.libraryapp.loanservice.entity.Loan;
 import com.turkcell.libraryapp.loanservice.exception.BusinessException;
+import com.turkcell.libraryapp.loanservice.security.IdentityGuard;
 import com.turkcell.libraryapp.loanservice.service.LoanService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,9 +22,11 @@ import java.util.stream.Collectors;
 public class LoanController {
 
     private final LoanService loanService;
+    private final IdentityGuard identityGuard;
 
     @PostMapping
     public ResponseEntity<LoanResponseDto> createLoan(@Valid @RequestBody LoanCreateRequest request) {
+        identityGuard.requireSelf(request.getStudentId());
         // Business validations are done in service layer via Feign clients
         Loan loan = new Loan();
         loan.setStudentId(request.getStudentId());
@@ -41,6 +44,7 @@ public class LoanController {
     @PostMapping("/return")
     public ResponseEntity<LoanResponseDto> returnLoan(@Valid @RequestBody LoanReturnRequest request) {
         Loan loan = loanService.getLoanById(request.getLoanId());
+        identityGuard.requireSelf(loan.getStudentId());
         
         if (loan.getIsReturned()) {
             throw new BusinessException("Loan already returned");
@@ -58,6 +62,7 @@ public class LoanController {
     public ResponseEntity<List<LoanResponseDto>> getMemberLoans(
             @PathVariable Long memberId,
             @RequestParam(required = false) String status) {
+        identityGuard.requireSelf(memberId);
         
         List<Loan> loans;
         if (status != null) {
@@ -75,6 +80,7 @@ public class LoanController {
     @GetMapping("/{id}")
     public ResponseEntity<LoanResponseDto> getLoanById(@PathVariable Long id) {
         Loan loan = loanService.getLoanById(id);
+        identityGuard.requireSelf(loan.getStudentId());
         LoanResponseDto response = mapToDto(loan);
         return ResponseEntity.ok(response);
     }
@@ -87,6 +93,7 @@ public class LoanController {
     
     @GetMapping
     public ResponseEntity<List<LoanResponseDto>> getAllLoans() {
+        identityGuard.requireLibrarian();
         List<Loan> loans = loanService.getAllLoans();
         List<LoanResponseDto> responses = loans.stream()
                 .map(this::mapToDto)
