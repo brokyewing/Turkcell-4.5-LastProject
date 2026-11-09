@@ -29,6 +29,8 @@ public class JwtService {
                 .subject(student.getStudentNumber())        // kimin token'ı
                 .claim("studentId", student.getId())
                 .claim("name", student.getName())
+                // DDL ile sonradan eklenen kolonda eski satırlar null olabilir → güvenli varsayılan.
+                .claim("role", student.getRole() != null ? student.getRole().name() : "STUDENT")
                 .issuedAt(now)
                 .expiration(new Date(now.getTime() + expirationMs))  // ne zaman geçersiz
                 .signWith(key)                               // imza — kurcalanırsa doğrulama patlar

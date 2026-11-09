@@ -30,7 +30,8 @@ public class AuthController {
         }
 
         String token = jwtService.generateToken(student);
-        return new LoginResponse(token, student.getStudentNumber(), student.getName());
+        String role = student.getRole() != null ? student.getRole().name() : "STUDENT";
+        return new LoginResponse(token, student.getStudentNumber(), student.getName(), role);
     }
 
     // BCrypt eşleşmesi. Eski düz-metin parolalar için: eşleşirse ilk girişte
