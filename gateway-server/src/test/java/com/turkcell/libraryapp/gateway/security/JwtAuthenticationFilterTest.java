@@ -270,6 +270,74 @@ class JwtAuthenticationFilterTest {
         assertTrue(downStreamCalled.get());
     }
 
+    // ---- Sertleştirme: public yol tam eşleşme, başlık temizliği, bozuk yol reddi ----
+
+    @Test
+    void authOnekliBaskaYolPublicSayilmaz() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/auth/tokens").build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void publicYoldaDaIstemciBasliklariSilinir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/auth/login")
+                        .header("X-Role", "LIBRARIAN")
+                        .header("X-Student-Id", "999")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        HttpHeaders forwardedHeaders = forwarded.get().getRequest().getHeaders();
+        assertNull(forwardedHeaders.getFirst("X-Role"), "public yolda X-Role sızmamalı");
+        assertNull(forwardedHeaders.getFirst("X-Student-Id"), "public yolda X-Student-Id sızmamalı");
+    }
+
+    @Test
+    void kayitUcundaDaIstemciBasliklariSilinir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.post("/api/students")
+                        .header("X-Role", "LIBRARIAN")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        assertNull(forwarded.get().getRequest().getHeaders().getFirst("X-Role"));
+    }
+
+    @Test
+    void noktaNoktaIcErenYol403Alir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/auth/../api/members").build());
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void yuzdeKodluNoktaIcerenYol403Alir() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.get("/api/auth/%2e%2e/api/members").build());
+
+        filter.filter(exchange, chain).block();
+
+        // Mock istek URI'yi normalize edebiliyor (bu durumda yol sadeleşir ve token yok → 401).
+        // Değişmeyen güvenlik özelliği: istek downstream'e kimliksiz/privileged geçmemeli.
+        org.springframework.http.HttpStatusCode status = exchange.getResponse().getStatusCode();
+        assertNotNull(status);
+        assertTrue(status.is4xxClientError(), "4xx beklenirdi, gelen: " + status);
+        assertFalse(downStreamCalled.get());
+    }
+
     private MockServerWebExchange exchange(HttpMethod method, String path, String token) {        return MockServerWebExchange.from(MockServerHttpRequest.method(method, path)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
                 .build());

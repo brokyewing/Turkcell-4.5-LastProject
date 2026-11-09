@@ -32,8 +32,12 @@ import java.util.regex.Pattern;
 @Component
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
+    // Public yollar. /api/auth/login TAM eşleşme: önek olsaydı "/api/auth/../api/members"
+    // gibi bir yol hem burada public sayılıp hem aşağıda route edilebilirdi.
+    private static final String PUBLIC_LOGIN_PATH = "/api/auth/login";
+
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/", "/swagger", "/v3/api-docs", "/actuator/health");
+            "/swagger", "/v3/api-docs", "/actuator/health");
 
     // Kayıt ucu (yalnız POST) token istemez; GET/PUT/DELETE /api/students... hâlâ korumalı.
     private static final String PUBLIC_STUDENTS_PATH = "/api/students";
@@ -81,13 +85,21 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         String path = exchange.getRequest().getPath().value();
         HttpMethod method = exchange.getRequest().getMethod();
 
-        if (PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
-            return chain.filter(exchange);
+        // Yol normalizasyon kaçışlarını (../, //, ;, ters bölü, %2e) en başta reddet:
+        // aksi halde public bir önek "/api/auth/../api/members" olarak korumalı uca çevrilebilir.
+        if (isSuspiciousPath(path)) {
+            return error(exchange, HttpStatus.FORBIDDEN, "Malformed request path");
+        }
+
+        if (PUBLIC_LOGIN_PATH.equals(path)
+                || PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
+            // Public dalda bile istemcinin X-Role/X-Student-Id başlıkları silinir.
+            return chain.filter(stripIdentityHeaders(exchange));
         }
         // Yalnız POST /api/students (kayıt) public; path tam eşleşmeli ki
         // /api/students/5 gibi alt yollar da korumalı kalsın.
         if (HttpMethod.POST.equals(method) && PUBLIC_STUDENTS_PATH.equals(path)) {
-            return chain.filter(exchange);
+            return chain.filter(stripIdentityHeaders(exchange));
         }
 
         String authHeader = exchange.getRequest().getHeaders().getFirst(HttpHeaders.AUTHORIZATION);
@@ -130,8 +142,7 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
         Object studentId = claims.get("studentId");
         ServerHttpRequest request = exchange.getRequest().mutate()
                 .headers(headers -> {
-                    headers.remove("X-Student-Id");
-                    headers.remove("X-Role");
+                    removeClientIdentityHeaders(headers);
                     if (studentId != null) {
                         headers.set("X-Student-Id", String.valueOf(studentId));
                     }
@@ -139,6 +150,33 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
                 })
                 .build();
         return exchange.mutate().request(request).build();
+    }
+
+    /** Kimliksiz (public) isteklerde de istemcinin kimlik başlıkları downstream'e sızmamalı. */
+    private ServerWebExchange stripIdentityHeaders(ServerWebExchange exchange) {
+        ServerHttpRequest request = exchange.getRequest().mutate()
+                .headers(this::removeClientIdentityHeaders)
+                .build();
+        return exchange.mutate().request(request).build();
+    }
+
+    private void removeClientIdentityHeaders(HttpHeaders headers) {
+        headers.remove("X-Student-Id");
+        headers.remove("X-Role");
+    }
+
+    /**
+     * Yol kaçışı/normalizasyon denemelerini yakalar: "..", "//", ";", ters bölü ve
+     * yüzde kodlu nokta (%2e). Bu yolların hiçbiri meşru değil.
+     */
+    private boolean isSuspiciousPath(String path) {
+        String lower = path.toLowerCase(java.util.Locale.ROOT);
+        return lower.contains("..")
+                || lower.contains("//")
+                || lower.contains(";")
+                || lower.contains("\\")
+                || lower.contains("%2e")
+                || lower.contains("%2f");
     }
 
     /**
