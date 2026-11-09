@@ -33,7 +33,7 @@ import java.util.regex.Pattern;
 public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     private static final List<String> PUBLIC_PATHS = List.of(
-            "/api/auth/", "/swagger", "/v3/api-docs", "/actuator");
+            "/api/auth/", "/swagger", "/v3/api-docs", "/actuator/health");
 
     // Kayıt ucu (yalnız POST) token istemez; GET/PUT/DELETE /api/students... hâlâ korumalı.
     private static final String PUBLIC_STUDENTS_PATH = "/api/students";
@@ -92,11 +92,10 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return error(exchange, HttpStatus.UNAUTHORIZED, "Invalid or expired token");
         }
 
-        // Eski token'larda role yoksa öğrenci say (en az yetkili varsayılan).
-        String role = claims.get("role", String.class);
-        if (role == null) {
-            role = ROLE_STUDENT;
-        }
+        // Eski token'larda role yoksa — ya da claim String değilse (dizi/sayı) — öğrenci say
+        // (en az yetkili varsayılan); beklenmedik tip 500 yerine 403'e düşsün.
+        Object roleClaim = claims.get("role");
+        String role = roleClaim instanceof String value && !value.isBlank() ? value : ROLE_STUDENT;
 
         if (!ROLE_LIBRARIAN.equals(role) && !isStudentAllowed(method, path)) {
             return error(exchange, HttpStatus.FORBIDDEN, "Access denied for role " + role);
