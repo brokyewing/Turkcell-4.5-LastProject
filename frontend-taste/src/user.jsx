@@ -6,7 +6,6 @@ export default function UserView({ me }) {
   const [books, setBooks] = useState([])
   const [loans, setLoans] = useState([])
   const [copies, setCopies] = useState([])
-  const [busyCopyIds, setBusyCopyIds] = useState(() => new Set())
   const [finesTotal, setFinesTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -22,19 +21,18 @@ export default function UserView({ me }) {
     ;(async () => {
       setLoading(true); setError(null)
       try {
-        const [b, l, c, allLoans, f] = await Promise.all([
+        // GET /api/loans yalnız LIBRARIAN'a açık; öğrenci için kullanılmaz.
+        // Müsaitlik, kitap DTO'sundaki availableCopies/totalCopies alanlarından okunur.
+        const [b, l, c, f] = await Promise.all([
           api.getBooks(),
           me.studentId ? api.getMyLoans(me.studentId).catch(() => []) : Promise.resolve([]),
           api.getCopyBooks().catch(() => []),
-          api.getLoans().catch(() => []),
           me.studentId ? api.getMyFinesTotal(me.studentId).catch(() => 0) : Promise.resolve(0),
         ])
         if (!alive) return
-        setBooks(b)
+        setBooks(b || [])
         setLoans(l || [])
         setCopies(c || [])
-        // Aynı kopya aynı anda iki kez ödünç verilemez; açık ödünçteki kopyaları işaretle.
-        setBusyCopyIds(new Set((allLoans || []).filter((x) => !x.isReturned).map((x) => x.copyBookId)))
         setFinesTotal(Number(f) || 0)
       } catch (e) {
         if (alive) setError(e.message)
@@ -47,18 +45,25 @@ export default function UserView({ me }) {
 
   const openLoans = loans.filter((l) => !l.isReturned)
 
-  function freeCopies(bookId) {
-    return copies.filter((c) => c.bookId === bookId && !busyCopyIds.has(c.id))
+  // Kitap DTO'su stok adedini verir (availableCopies). 0 ise hiç kopya yok.
+  function availableCount(book) {
+    return Math.max(0, Number(book.availableCopies) || 0)
+  }
+
+  // Kitabın kopyaları; öğrencinin kendi açık ödünçlerindeki kopyalar elenir.
+  function copyCandidates(book) {
+    const mine = new Set(openLoans.map((l) => l.copyBookId))
+    return copies.filter((c) => c.bookId === book.id && !mine.has(c.id))
   }
 
   function startBorrow(book) {
     setMsg(null)
-    const free = freeCopies(book.id)
-    if (free.length === 0) {
+    const candidates = copyCandidates(book)
+    if (availableCount(book) === 0 || candidates.length === 0) {
       setMsg({ err: true, text: `"${book.title}" için ödünç verilebilir kopya yok.` })
       return
     }
-    setBorrow({ book, copyId: String(free[0].id), due: isoDate(addDays(new Date(), 14)) })
+    setBorrow({ book, copyId: String(candidates[0].id), candidates, due: isoDate(addDays(new Date(), 14)) })
   }
 
   async function confirmBorrow(e) {
@@ -71,16 +76,28 @@ export default function UserView({ me }) {
     }
     setBusy(true); setMsg(null)
     try {
-      await api.createLoan({
-        studentId: Number(me.studentId),
-        copyBookId: Number(borrow.copyId),
-        dueDate: `${borrow.due}T00:00:00`,
-      })
-      setMsg({ text: `"${borrow.book.title}" ödünç alındı. İade: ${fmt(borrow.due)}.` })
-      setBorrow(null)
-      setReloadKey((k) => k + 1)
-    } catch (e) {
-      setMsg({ err: true, text: e.message })
+      // Kopya bazlı doluluk öğrenciye açık bir uçtan okunamıyor; seçilen kopya
+      // zaten ödünçteyse ("already loaned") sıradaki adayı dene.
+      const ordered = [String(borrow.copyId), ...borrow.candidates.map((c) => String(c.id))]
+        .filter((id, i, arr) => arr.indexOf(id) === i)
+      let lastErr = null
+      for (const copyId of ordered) {
+        try {
+          await api.createLoan({
+            studentId: Number(me.studentId),
+            copyBookId: Number(copyId),
+            dueDate: `${borrow.due}T00:00:00`,
+          })
+          setMsg({ text: `"${borrow.book.title}" ödünç alındı. İade: ${fmt(borrow.due)}.` })
+          setBorrow(null)
+          setReloadKey((k) => k + 1)
+          return
+        } catch (e) {
+          lastErr = e
+          if (!/already loaned/i.test(e.message)) break
+        }
+      }
+      setMsg({ err: true, text: lastErr ? lastErr.message : 'Ödünç alınamadı.' })
     } finally {
       setBusy(false)
     }
@@ -99,7 +116,7 @@ export default function UserView({ me }) {
     }
   }
 
-  const borrowFree = borrow ? freeCopies(borrow.book.id) : []
+  const borrowFree = borrow ? borrow.candidates : []
 
   return (
     <div className="page">
@@ -192,7 +209,7 @@ export default function UserView({ me }) {
         ) : (
           <div className="books">
             {books.map((b, i) => {
-              const freeCount = freeCopies(b.id).length
+              const freeCount = availableCount(b)
               const hasFree = freeCount > 0
               return (
                 <div className="book rise" key={b.id} style={{ animationDelay: `${i * 0.03}s` }}>

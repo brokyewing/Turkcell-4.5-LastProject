@@ -5,11 +5,12 @@ import UserView from './user.jsx'
 
 export default function App() {
   const [authed, setAuthed] = useState(!!getToken())
-  const [surface, setSurface] = useState('user')
+  // null → role göre başlangıç yüzeyi (kütüphaneci admin, öğrenci user).
+  const [surface, setSurface] = useState(null)
 
   // 401 alındığında api katmanı bu olayı yayınlar; oturumu burada kapatıyoruz.
   useEffect(() => {
-    function onLogout() { setAuthed(false) }
+    function onLogout() { setAuthed(false); setSurface(null) }
     window.addEventListener('auth:logout', onLogout)
     return () => window.removeEventListener('auth:logout', onLogout)
   }, [])
@@ -17,15 +18,19 @@ export default function App() {
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 
   const me = decodeToken() || {}
-  function logout() { setToken(null); setAuthed(false) }
+  const isLibrarian = me.role === 'LIBRARIAN'
+  const active = surface || (isLibrarian ? 'admin' : 'user')
+  function logout() { setToken(null); setAuthed(false); setSurface(null) }
 
   return (
     <div className="shell">
       <header className="topbar">
         <div className="brand"><span className="dot">K</span> Kitaplık</div>
         <div className="switch">
-          <button className={surface === 'user' ? 'on' : ''} onClick={() => setSurface('user')}>Üye</button>
-          <button className={surface === 'admin' ? 'on' : ''} onClick={() => setSurface('admin')}>Kütüphaneci</button>
+          <button className={active === 'user' ? 'on' : ''} onClick={() => setSurface('user')}>Üye</button>
+          {isLibrarian && (
+            <button className={active === 'admin' ? 'on' : ''} onClick={() => setSurface('admin')}>Kütüphaneci</button>
+          )}
         </div>
         <div className="who">
           <span className="av">{(me.name || 'K')[0]}</span>
@@ -33,7 +38,7 @@ export default function App() {
           <button className="btn line sm" onClick={logout}>Çıkış</button>
         </div>
       </header>
-      {surface === 'user' ? <UserView me={me} /> : <AdminView />}
+      {active === 'admin' && isLibrarian ? <AdminView /> : <UserView me={me} />}
     </div>
   )
 }

@@ -16,7 +16,9 @@ export function decodeToken() {
     const b64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
     const pad = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
     const payload = JSON.parse(atob(pad))
-    return { studentId: payload.studentId, name: payload.name, sub: payload.sub }
+    // role claim'i gateway ile aynı semantik: yoksa STUDENT varsay.
+    const role = typeof payload.role === 'string' && payload.role ? payload.role : 'STUDENT'
+    return { studentId: payload.studentId, name: payload.name, sub: payload.sub, role }
   } catch {
     return null
   }

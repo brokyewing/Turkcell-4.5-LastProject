@@ -3,7 +3,7 @@ import { DataProvider, useData } from './data'
 import { ToastProvider } from './ui'
 import { Icon } from './icons'
 import { Dashboard, BooksView, AuthorsView, CategoriesView } from './views'
-import { api, setToken, isAuthed } from './api'
+import { api, setToken, isAuthed, decodeToken } from './api'
 
 const NAV = [
   { key: 'dashboard', label: 'Genel Bakış', icon: Icon.Dashboard },
@@ -99,12 +99,40 @@ export default function App() {
 
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 
+  const me = decodeToken() || {}
+  const logout = () => { setToken(null); setAuthed(false) }
+
+  // Yönetim paneli yalnız kütüphaneci hesaplara açık.
+  if (me.role !== 'LIBRARIAN') return <Forbidden me={me} onLogout={logout} />
+
   return (
     <ToastProvider>
       <DataProvider>
-        <Shell onLogout={() => { setToken(null); setAuthed(false) }} />
+        <Shell onLogout={logout} />
       </DataProvider>
     </ToastProvider>
+  )
+}
+
+/* Rol kapısı: STUDENT (veya role claim'i olmayan) hesaplara sade yetkisiz ekranı. */
+function Forbidden({ me, onLogout }) {
+  return (
+    <div className="auth-wrap">
+      <div className="auth-card">
+        <div className="brand">
+          <span className="logo"><Icon.Book size={20} /></span>
+          <span>LibraryApp<small>Yönetim Paneli</small></span>
+        </div>
+        <h1 style={{ fontSize: 20, margin: '20px 0 8px' }}>Yönetim paneline erişim yok</h1>
+        <p className="sub" style={{ textAlign: 'left', marginTop: 0 }}>
+          Bu panel kütüphaneci hesapları içindir.
+        </p>
+        {me.name && <p className="sub" style={{ textAlign: 'left', marginTop: 0 }}>{me.name}{me.sub ? ` (${me.sub})` : ''}</p>}
+        <button className="btn primary" type="button" onClick={onLogout} style={{ width: '100%', justifyContent: 'center' }}>
+          Çıkış
+        </button>
+      </div>
+    </div>
   )
 }
 
