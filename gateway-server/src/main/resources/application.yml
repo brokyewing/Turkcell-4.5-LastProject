@@ -6,6 +6,21 @@ spring:
     name: gateway-server
   cloud:
     gateway:
+      # CORS: Vite dev sunucusu /api'yi proxy'ler (aynı origin), ama `npm run preview`
+      # (4173) veya ayrı origin'deki bir frontend doğrudan gateway'e konuşacaksa
+      # tarayıcı preflight'ı geçmeli. Token localStorage'da ve Authorization başlığıyla
+      # gittiği için cookie tabanlı CSRF riski yok; bu yüzden allow-credentials=false.
+      # İzinli origin'ler CORS_ALLOWED_ORIGINS (virgülle ayrılmış) ile genişletilebilir.
+      globalcors:
+        add-to-simple-url-handler-mapping: true
+        cors-configurations:
+          '[/**]':
+            allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:5174,http://localhost:4173,http://127.0.0.1:5173,http://127.0.0.1:5174,http://127.0.0.1:4173}
+            allowed-methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+            allowed-headers: [Authorization, Content-Type, X-Requested-With]
+            exposed-headers: [X-Auth-Error]
+            allow-credentials: false
+            max-age: 3600
       routes:
         - id: book-service
           uri: lb://book-service

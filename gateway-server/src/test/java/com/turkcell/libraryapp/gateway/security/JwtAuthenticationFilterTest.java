@@ -379,6 +379,40 @@ class JwtAuthenticationFilterTest {
         assertFalse(downStreamCalled.get());
     }
 
+    // ---- CORS preflight ----
+
+    @Test
+    void preflightOptionsTokensuzGecer() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.options("/api/books")
+                        .header("Origin", "http://localhost:5174")
+                        .header("Access-Control-Request-Method", "GET")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get(), "OPTIONS preflight zincire devam etmeliydi");
+        assertNull(exchange.getResponse().getStatusCode());
+    }
+
+    @Test
+    void preflightOptionsKimlikBasligiTasimaz() {
+        MockServerWebExchange exchange = MockServerWebExchange.from(
+                MockServerHttpRequest.options("/api/students/2")
+                        .header("Origin", "http://localhost:5174")
+                        .header("Access-Control-Request-Method", "GET")
+                        .header("X-Role", "LIBRARIAN")
+                        .header("X-Student-Id", "999")
+                        .build());
+
+        filter.filter(exchange, chain).block();
+
+        assertTrue(downStreamCalled.get());
+        HttpHeaders forwardedHeaders = forwarded.get().getRequest().getHeaders();
+        assertNull(forwardedHeaders.getFirst("X-Role"));
+        assertNull(forwardedHeaders.getFirst("X-Student-Id"));
+    }
+
     /** Yolu ham hâliyle taşıyan exchange (yüzde kodlamayı iki kez kodlamaz). */
     private MockServerWebExchange exchangeWithPath(String path) {
         return MockServerWebExchange.from(

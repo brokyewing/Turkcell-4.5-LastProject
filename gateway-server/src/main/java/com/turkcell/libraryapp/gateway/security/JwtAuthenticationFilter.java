@@ -91,6 +91,11 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
             return error(exchange, HttpStatus.FORBIDDEN, "Malformed request path");
         }
 
+        // CORS preflight (OPTIONS) token taşımaz; 401 dönmemeli. Kimlik başlıkları yine silinir.
+        if (HttpMethod.OPTIONS.equals(method)) {
+            return chain.filter(stripIdentityHeaders(exchange));
+        }
+
         if (PUBLIC_LOGIN_PATH.equals(path)
                 || PUBLIC_PATHS.stream().anyMatch(path::startsWith)) {
             // Public dalda bile istemcinin X-Role/X-Student-Id başlıkları silinir.
