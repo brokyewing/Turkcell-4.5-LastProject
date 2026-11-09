@@ -167,7 +167,12 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
 
     /**
      * Yol kaçışı/normalizasyon denemelerini yakalar: "..", "//", ";", ters bölü ve
-     * yüzde kodlu nokta (%2e). Bu yolların hiçbiri meşru değil.
+     * yüzde kodlu nokta (%2e) / eğik çizgi (%2f).
+     *
+     * <p>NOT: Spring Cloud Gateway route eşleşmesini global filtrelerden ÖNCE yapar.
+     * Yani route predicated'ine uymayan bozuk bir yol (ör. "//api/students") filtreye hiç
+     * gelmeden 404 alır — bu zararsızdır. Buradaki kontrol, route'a UYAN bozuk yolları
+     * (ör. "/api/auth/../api/members" → Path=/api/auth/** eşleşir) 403 ile durdurur.
      */
     private boolean isSuspiciousPath(String path) {
         String lower = path.toLowerCase(java.util.Locale.ROOT);

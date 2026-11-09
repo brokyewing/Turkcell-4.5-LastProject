@@ -14,6 +14,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 import javax.crypto.SecretKey;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
 import java.util.List;
@@ -314,8 +315,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void noktaNoktaIcErenYol403Alir() {
-        MockServerWebExchange exchange = MockServerWebExchange.from(
-                MockServerHttpRequest.get("/api/auth/../api/members").build());
+        MockServerWebExchange exchange = exchangeWithPath("/api/auth/../api/members");
 
         filter.filter(exchange, chain).block();
 
@@ -325,17 +325,64 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void yuzdeKodluNoktaIcerenYol403Alir() {
+        MockServerWebExchange exchange = exchangeWithPath("/api/auth/%2e%2e/api/members");
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void yuzdeKodluEgikCizgiIcerenYol403Alir() {
+        MockServerWebExchange exchange = exchangeWithPath("/api/books/a%2fb");
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void ciftEgikCizgiIcerenYol403Alir() {
+        MockServerWebExchange exchange = exchangeWithPath("//api/students");
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    @Test
+    void noktaliVirgulIcerenYol403Alir() {
+        MockServerWebExchange exchange = exchangeWithPath("/api/books;jsessionid=abc");
+
+        filter.filter(exchange, chain).block();
+
+        assertEquals(HttpStatus.FORBIDDEN, exchange.getResponse().getStatusCode());
+        assertFalse(downStreamCalled.get());
+    }
+
+    // Gerçek bir URI ile gelirse Spring/Netty yolu normalize edebilir; normalize olup
+    // korumalı bir yola dönüşse bile istek kimliksiz geçmemeli (401/403), downstream'e varmamalı.
+    @Test
+    void kodluNoktaIcerenGercekUriKimliksizGecmez() {
         MockServerWebExchange exchange = MockServerWebExchange.from(
                 MockServerHttpRequest.get("/api/auth/%2e%2e/api/members").build());
 
         filter.filter(exchange, chain).block();
 
-        // Mock istek URI'yi normalize edebiliyor (bu durumda yol sadeleşir ve token yok → 401).
-        // Değişmeyen güvenlik özelliği: istek downstream'e kimliksiz/privileged geçmemeli.
         org.springframework.http.HttpStatusCode status = exchange.getResponse().getStatusCode();
         assertNotNull(status);
-        assertTrue(status.is4xxClientError(), "4xx beklenirdi, gelen: " + status);
+        assertTrue(status.value() == 401 || status.value() == 403,
+                "401 veya 403 beklenirdi, gelen: " + status);
         assertFalse(downStreamCalled.get());
+    }
+
+    /** Yolu ham hâliyle taşıyan exchange (yüzde kodlamayı iki kez kodlamaz). */
+    private MockServerWebExchange exchangeWithPath(String path) {
+        return MockServerWebExchange.from(
+                MockServerHttpRequest.method(HttpMethod.GET, URI.create("http://localhost" + path)).build());
     }
 
     private MockServerWebExchange exchange(HttpMethod method, String path, String token) {        return MockServerWebExchange.from(MockServerHttpRequest.method(method, path)
