@@ -78,3 +78,14 @@ yarn-error.log
 
 
 
+
+# AI ajan dosyalari (git disi)
+.claude/
+.beyin/
+founder/
+/AGENTS.md
+/CLAUDE.md
+/CODEX.md
+/GEMINI.md
+/OPENCODE.md
+/CONTINUE.md
