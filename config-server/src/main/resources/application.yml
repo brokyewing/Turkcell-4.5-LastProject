@@ -11,7 +11,10 @@ spring:
     config:
       server:
         native:
-          search-locations: classpath:/configurations,file:./configurations,file:/app/configurations
+          # Servislerin kendi application.yml'leri var; config-server şu an istemciye
+          # yapılandırma sunmuyor (spring.config.import kullanan servis yok).
+          # İleride bağlanırsa dosyalar buraya taşınacak.
+          search-locations: classpath:/
 
 eureka:
   client:

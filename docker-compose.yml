@@ -86,8 +86,6 @@ services:
       - library-network
     environment:
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
-    volumes:
-      - ./configurations:/app/configurations
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8888/actuator/health || exit 1"]
       interval: 15s
