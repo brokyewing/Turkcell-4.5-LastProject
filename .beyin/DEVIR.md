@@ -31,7 +31,7 @@
    vault commit `fe31ff0` push edilsin mi.
 
 ## Engeller
-- Commit/push ve silme için kullanıcı onayı gerekiyor (Kapı 2). `main` **yerel**, `origin/main`'e push edilmedi.
+- `main` **`origin/main`'e push edildi** (`5939e7b..81ef769`). Silme (ör. `configurations/`) için onay gerekiyor.
 - Lokal **8080 dolu** (`wslrelay`): compose'u her zaman override ile çalıştır
   (`C:\Users\asker\AppData\Local\Temp\opencode\override-a4.yml`, proje adı `kitaplik`, gateway 18090).
 
