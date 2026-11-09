@@ -20,6 +20,22 @@ export function isAuthed() {
   return !!getToken()
 }
 
+// JWT payload'ını çöz (imza doğrulaması SUNUCUDA; burada role okunur).
+// role claim'i yoksa gateway ile aynı davranış: STUDENT kabul et.
+export function decodeToken() {
+  const current = getToken()
+  if (!current) return null
+  try {
+    const b64 = current.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')
+    const pad = b64.padEnd(b64.length + (4 - b64.length % 4) % 4, '=')
+    const payload = JSON.parse(atob(pad))
+    const role = typeof payload.role === 'string' && payload.role ? payload.role : 'STUDENT'
+    return { studentId: payload.studentId, name: payload.name, sub: payload.sub, role }
+  } catch {
+    return null
+  }
+}
+
 async function request(path, options = {}) {
   const current = getToken()
   if (!current && path !== '/auth/login') {
