@@ -136,10 +136,10 @@ function Forbidden({ me, onLogout }) {
   )
 }
 
-/* Basit login kapısı: token yoksa gösterilir. Demo: S1001 / pass123 */
+/* Basit login kapısı: token yoksa gösterilir. Panel kütüphaneci içindir: L1001 / librarian123 */
 function Login({ onSuccess }) {
-  const [studentNumber, setStudentNumber] = useState('S1001')
-  const [password, setPassword] = useState('pass123')
+  const [studentNumber, setStudentNumber] = useState('L1001')
+  const [password, setPassword] = useState('librarian123')
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
 
@@ -179,7 +179,7 @@ function Login({ onSuccess }) {
             {loading ? <><span className="spinner" /> Giriş yapılıyor…</> : 'Giriş yap'}
           </button>
         </form>
-        <p className="sub">Demo: S1001 / pass123</p>
+        <p className="sub">Demo: L1001 / librarian123</p>
       </div>
     </div>
   )

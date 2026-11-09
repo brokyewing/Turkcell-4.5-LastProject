@@ -59,8 +59,13 @@ export default function UserView({ me }) {
   function startBorrow(book) {
     setMsg(null)
     const candidates = copyCandidates(book)
-    if (availableCount(book) === 0 || candidates.length === 0) {
+    if (availableCount(book) === 0) {
       setMsg({ err: true, text: `"${book.title}" için ödünç verilebilir kopya yok.` })
+      return
+    }
+    // Stok var ama kopya listesi gelmediyse (ağ hatası) kullanıcıyı yanıltma.
+    if (candidates.length === 0) {
+      setMsg({ err: true, text: 'Kopya listesi yüklenemedi. Sayfayı yenileyip tekrar deneyin.' })
       return
     }
     setBorrow({ book, copyId: String(candidates[0].id), candidates, due: isoDate(addDays(new Date(), 14)) })
@@ -76,8 +81,9 @@ export default function UserView({ me }) {
     }
     setBusy(true); setMsg(null)
     try {
-      // Kopya bazlı doluluk öğrenciye açık bir uçtan okunamıyor; seçilen kopya
-      // zaten ödünçteyse ("already loaned") sıradaki adayı dene.
+      // `/api/copybooks/{id}/available` kopya bazlı değil, kitap stoğuna bakar
+      // (CopyBookServiceImpl.isAvailable). Yani "bu kopya ödünçte mi" öğrenciye açık
+      // bir uçtan öğrenilemiyor; seçilen kopya dolmuşsa ("already loaned") sıradakini dene.
       const ordered = [String(borrow.copyId), ...borrow.candidates.map((c) => String(c.id))]
         .filter((id, i, arr) => arr.indexOf(id) === i)
       let lastErr = null
@@ -88,7 +94,8 @@ export default function UserView({ me }) {
             copyBookId: Number(copyId),
             dueDate: `${borrow.due}T00:00:00`,
           })
-          setMsg({ text: `"${borrow.book.title}" ödünç alındı. İade: ${fmt(borrow.due)}.` })
+          // Seçilen kopya dolduysa sıradaki alınmış olabilir; gerçek kopyayı bildir.
+          setMsg({ text: `"${borrow.book.title}" ödünç alındı (Kopya #${copyId}). İade: ${fmt(borrow.due)}.` })
           setBorrow(null)
           setReloadKey((k) => k + 1)
           return
