@@ -3,35 +3,45 @@
 Durum: `[ ]` açık · `[~]` devam ediyor · `[x]` bitti · `[!]` engellendi
 
 ## Açık
-- [ ] **IDOR — sahiplik kontrolü** (YÜKSEK, `reviewer`+`security-auditor` bulgusu): gateway token'dan gelen
-  `X-Student-Id`'yi downstream'e taşıyor ama **hiçbir servis okumuyor**. Bugün STUDENT token'ıyla
-  `GET /api/students/{herhangiId}` (PII), `GET /api/loans/members/{herhangiId}`,
-  `POST /api/loans {studentId: başkası}` çalışıyor. Kabul: STUDENT kendi id'si dışındaki kaynaklara 403.
 - [ ] **CORS** (ORTA): gateway'de CORS yok → tarayıcıdan ayrı origin'deki frontend API'yi çağıramaz
   (preflight `OPTIONS` 403). Karar: frontend aynı origin'e ters-proxy mi, gateway'e `globalcors` mu?
-- [ ] **Frontend `role` kullanmıyor** (ORTA): `LoginResponse.role` ölü; `frontend-taste/App.jsx` herkese
-  "Kütüphaneci" sekmesini gösteriyor → STUDENT tıklayınca 403 yağmuru.
+- [ ] **Frontend `role` kullanmıyor** (ORTA): `LoginResponse.role` geliyor ama `frontend-taste/App.jsx`
+  herkese "Kütüphaneci" sekmesini gösteriyor → STUDENT tıklayınca 403 yağmuru.
 - [ ] **Tarayıcı E2E**: giriş → katalog → ödünç → iade → ceza, gerçek tarayıcıda bir kez elle.
+- [ ] **`main` push kararı**: `main` = `3038339`, `origin/main` = `ce3d349` (6 commit ileride). Kullanıcı onayı bekliyor.
+- [ ] **Sertleştirme turu** (düşük, engelleyici değil): `IdentityGuard` fail-open (NetworkPolicy / iç secret);
+  guard'sız `MemberController` + `@RequestBody Student` mass-assignment; 403/404 varlık oracle'ı;
+  `IdentityGuard` 4 kopya → ortak modül.
 - [ ] **A3-artık** (düşük): commit-anı rollback telafisi (`afterCompletion`) için entegrasyon testi;
   `returnLoan` telafisini işlem kimliğine bağlama.
-- [ ] **`configurations/` ölü mü?** (kanıtlandı: hiçbir serviste `spring-cloud-starter-config` yok,
-  hiçbir `application.yml`'de `spring.config.import` yok) — silme kararı **kullanıcıda**.
 - [ ] **`03-microservices/4.5-microservices`** git deposu 0 commit'li — karar kullanıcıda.
+- [ ] **Vault commit `fe31ff0`** (Obsidian) yerelde, push edilmedi — karar kullanıcıda.
 
 ## Ajan panosu
 
 | Kart | Rol | Durum | Kabul | Kanıt / not |
 |---|---|---|---|---|
-| A1 | builder | bitti | login 200+JWT; tokenlı books 200 | book 6/6; kayıt → "Genel" |
-| A2 | builder + frontend | bitti | iki app build rc=0 | `8fd3e64`; 401'de oturum kapanışı |
-| A3 | builder | bitti | 4 servis testi yeşil | book 6 · loan 15 · fine 6 · reservation 7 |
-| A4a | builder | bitti | STUDENT `DELETE /api/books/1` 403 | `8cbd5f5`; gateway 8 test |
-| A4b | devops | bitti | yalnız gateway host portu | `d06ea82`; port tablosu doğrulandı |
-| A4c | builder | bitti | `ddl-auto: none` ile açılış | `a48a942`; canlı DB "up to date" |
-| A4d | builder | bitti | iki Flyway kırıcısı + seed/env | `f56bf2b`; canlı+taze DB kanıtı |
-| İnceleme | reviewer + security-auditor | bitti | şiddet sıralı bulgu | 2 KIRICI bulundu → A4d'de kapandı |
+| C1 | devops | bitti | `configurations/` yok; config-server health 200 | `bed40c7`; compose/build doğrulandı |
+| C2 | builder | bitti | 5 modül test yeşil; Feign bozulmadı | `616ef77`; 22+9+9+7+18 test |
+| C2-E2E | — | bitti | 19/19 sahiplik senaryosu | `e2e-c2.ps1` 0 FAIL; canlı konteynerler |
+| C2-Kontrol | reviewer | bitti | şiddet sıralı bulgu | 1 KIRICI iddia → canlıda sömürülemez çıktı |
+| GW-Sert | builder | bitti | gateway 23 test; traversal 403 | `3038339`; canlı 403/401 doğrulandı |
 
 ## Bitti
+- [x] **C1 — ölü `configurations/` kaldırıldı** (2026-11-09): 5 yml silindi; `config-server/Dockerfile`
+  COPY satırları, compose volume ve `search-locations` temizlendi (`classpath:/`). config-server
+  **kalıyor** (8 servislik mimarinin parçası) ama istemciye yapılandırma sunmuyor — hiçbir serviste
+  `spring-cloud-starter-config`/`spring.config.import` yok. Kanıt: imaj derlenip ayağa kalktı, health 200.
+- [x] **C2 — IDOR kapatıldı** (2026-11-09): gateway'de path-id ↔ token `studentId` eşitliği
+  (`/api/students/{id}`, `/api/loans/members/{id}`, `/api/borrow/me/{id}`, `/api/fines/students/{id}/total`);
+  4 serviste `IdentityGuard` + `ForbiddenException` + 403 handler. LIBRARIAN serbest, `X-Role` yoksa
+  iç çağrı sayılır (Feign bozulmadı), `X-Student-Id` + STUDENT → sahiplik zorunlu.
+  Canlı matris 19/19: kendi kaynak 200 · başkası 403 · spoof 403 · gerçek ödünç/iade 200.
+- [x] **C1+C2 merge** (2026-11-09): `main` `2c8a334`, çakışmasız; birleşik hâlde 71 test yeşil.
+- [x] **Gateway sertleştirme** (2026-11-09): public yol tam eşleşme (`/api/auth/login`), public dalda
+  kimlik başlığı temizliği, `../`/`//`/`;`/`\`/`%2e`/`%2f` içeren yol 403. `main` `3038339`; gateway 23 test.
+- [x] **Test verisi temizlendi**: loans 0 · fines 0 · reservations 0 · stoklar `available = total`.
+- [x] **Branş/worktree temizliği**: `c1-config`, `c2-idor` birleşti→silindi; `-wt/c1`, `-wt/c2` kaldırıldı.
 - [x] **İnceleme** (2026-11-08): 8 modül build, gerçek çalıştırma, 13 bulgu `PROJE.md`'de.
 - [x] **A1 — Nefes aldır** (2026-11-09): config-server native profil + Cloud 2025.0.3 hizası; `@EnableJpaAuditing` çakışması; seed; gateway'de public kayıt; `StudentCreateRequest` + `@Valid`; kayıtta varsayılan "Genel" bölümü.
 - [x] **A2 — Frontend'i bağla** (2026-11-09): `frontend-taste` gerçek API'ye bağlandı; `library-frontend` login + Page düzeltmesi; proxy 18090.
