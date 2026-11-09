@@ -37,8 +37,8 @@ Config + 5 iş servisi), PostgreSQL, Redis (cache), Kafka (yalnız `loan.returne
 | fine | 9 |
 | reservation | 9 |
 | member | 7 |
-| gateway | 23 |
-| **toplam** | **76, 0 fail** |
+| gateway | 27 |
+| **toplam** | **80, 0 fail** |
 | config-server, discovery-server | paket rc=0 (test yok) |
 
 ### Çalışma zamanı (gerçek konteynerler, `kitaplik` projesi, override-a4)

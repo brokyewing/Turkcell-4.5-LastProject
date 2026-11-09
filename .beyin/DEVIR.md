@@ -6,11 +6,11 @@ IDOR kapatıldı ve canlıda 19/19 sahiplik senaryosu doğrulandı
 
 ## Nerede kaldık
 - **Proje yolu:** `Projelerim\Turkcell-egitimi\04-bitirme\LibraryApp-Last`
-- `main` HEAD **`3038339`** (C1+C2 merge `2c8a334` + gateway sertleştirme `3038339`).
+- `main` HEAD **`3ac67bd`** (C1+C2 merge `2c8a334` + gateway sertleştirme `3038339` + test sıkılaştırma `3ac67bd`).
   `origin/main` hâlâ **`ce3d349`** — **push edilmedi** (kullanıcı onayı bekliyor).
 - Çalışma dalları temizlendi (`c1-config`, `c2-idor` birleşti ve silindi); worktree yok.
 - **Testler (birleşik hâl, `mvn -B clean test`):** book 6 · loan 22 · fine 9 · reservation 9 ·
-  member 7 · gateway 23 = **76 test, 0 fail**.
+  member 7 · gateway 27 = **80 test, 0 fail**.
 - **Uçtan uca (gerçek konteynerler, `kitaplik` projesi + override-a4, gateway 18090):**
   - 11/11 konteyner `healthy`; login `S1001` → STUDENT, `L1001` → LIBRARIAN ✔
   - **C2 IDOR matrisi 19/19 OK** (`%TEMP%\opencode\e2e-c2.ps1`):
@@ -32,11 +32,11 @@ IDOR kapatıldı ve canlıda 19/19 sahiplik senaryosu doğrulandı
 - **Servisler** (member/loan/reservation/fine): `security/IdentityGuard` —
   `X-Role: LIBRARIAN` serbest; `X-Role` yok = servisler arası (Feign) çağrı, serbest;
   `X-Student-Id` varsa sahiplik zorunlu. İhlal → `ForbiddenException` → `ExceptionDetails` gövdesiyle **403**.
-- **Gateway sertleştirme (`3038339`)**: public yol tam eşleşme (`/api/auth/login`), public dalda da
+- **Gateway sertleştirme (`3038339` + `3ac67bd`)**: public yol tam eşleşme (`/api/auth/login`), public dalda da
   `X-Role`/`X-Student-Id` silinir, `../` `//` `;` `\` `%2e` `%2f` içeren yol **403**.
 
 ## Sıradaki adım
-1. **Kullanıcı kararı: `main` (`3038339`) `origin`'e push edilsin mi?** (6 commit ileride)
+1. **Kullanıcı kararı: `main` (`3ac67bd`) `origin`'e push edilsin mi?** (7 commit ileride)
 2. **CORS** (ORTA): gateway'de CORS yok → tarayıcıdan ayrı origin'deki frontend preflight'ı 403.
    Karar: frontend'i aynı origin'e ters-proxy mi, gateway'e `globalcors` mu?
 3. **Frontend `role` kullanmıyor** (ORTA): `LoginResponse.role` geliyor ama `frontend-taste/App.jsx`
