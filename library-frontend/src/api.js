@@ -1,6 +1,9 @@
-// Tüm istekler /api ile başlar ve Vite proxy tarafından gateway'e (18090)
+// Tüm istekler API köküyle başlar ve Vite proxy tarafından gateway'e (18090)
 // iletilir. Gateway de Eureka'ya sorup doğru mikroservise yönlendirir.
+// API kökü: üretimde '/api' (tek origin), alt yol demosunda VITE_API_BASE ile ezilir.
 // JWT token localStorage'da tutulur; her korumalı isteğe Authorization eklenir.
+
+const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '')
 
 const TOKEN_KEY = 'library_token'
 
@@ -31,9 +34,7 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (current) headers.Authorization = `Bearer ${current}`
 
-  // BASE_URL her zaman '/' ile döner ('/admin/' veya '/demos/kitaplik/admin/');
-  // alt yolda sunulduğunda istekler de doğru köke gider.
-  const res = await fetch(`${import.meta.env.BASE_URL}api${path}`, { ...options, headers })
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
 
   if (res.status === 401) {
     setToken(null)

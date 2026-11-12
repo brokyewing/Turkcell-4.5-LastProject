@@ -1,14 +1,20 @@
 # İki React/Vite ön yüzünü derler ve tek bir Caddy konteynerinde sunar.
 #
-# Kritik nokta: iki frontend de API'yi GÖRELİ `/api` yoluyla çağırıyor
-# (frontend-taste/src/api.js:34, library-frontend/src/api.js:51).
-# Caddy `/api/*` isteklerini gateway'e proxy'ler → tarayıcı açısından AYNI ORIGIN.
-# Üretimde CORS hiç tetiklenmez.
+# Kritik nokta: iki frontend de API'yi kendi API köküyle çağırıyor ve bu kök
+# ayrı bir env değişkenidir (frontend-taste/src/api.js, library-frontend/src/api.js
+# içindeki API_BASE). Varsayılan '/api' → Caddy `/api/*` isteklerini gateway'e
+# proxy'ler → tarayıcı açısından AYNI ORIGIN. Üretimde CORS hiç tetiklenmez.
 #
-# İki base de parametre: alt yol demosu (ör. Sayfam'da /demos/kitaplik/)
-# için build arg olarak verilir:
-#   --build-arg APP_BASE=/demos/kitaplik/ --build-arg ADMIN_BASE=/demos/kitaplik/admin/
-# Varsayılanlar (/ ve /admin/) mevcut üretim davranışını birebir korur.
+# Asset base ve API base birbirinden BAĞIMSIZDIR: alt yolda asset'ler o önekin
+# altında sunulurken API kökü ayrıca verilebilir. Demo (ör. Sayfam'da
+# /demos/kitaplik/) için:
+#   --build-arg APP_BASE=/demos/kitaplik/ \
+#   --build-arg ADMIN_BASE=/demos/kitaplik/admin/ \
+#   --build-arg APP_API_BASE=/demos/kitaplik/api \
+#   --build-arg ADMIN_API_BASE=/demos/kitaplik/api \
+#   --build-arg CADDYFILE=deploy/Caddyfile.demo
+# Hiçbiri verilmezse üretim davranışı birebir korunur
+# (asset base'leri / ve /admin/, API '/api', Caddyfile deploy/Caddyfile).
 # Yerel geliştirmede VITE_BASE yok → base '/' (http://localhost:5173/), değişmez.
 #
 # Bağlam: depo kökü (docker-compose.prod.yml `build.context: .`)
@@ -17,30 +23,37 @@ ARG NODE_IMAGE=node:22-alpine
 ARG CADDY_IMAGE=caddy:2-alpine
 ARG APP_BASE=/
 ARG ADMIN_BASE=/admin/
+ARG APP_API_BASE=/api
+ARG ADMIN_API_BASE=/api
+# Üretimde deploy/Caddyfile; demoda deploy/Caddyfile.demo.
+ARG CADDYFILE=deploy/Caddyfile
 
 # --- 1) frontend-taste (üye + kütüphaneci yüzeyi) → / (ya da APP_BASE) ---
 FROM ${NODE_IMAGE} AS app
 # Global ARG'ı stage'e taşı (varsayılanı global bildirimden miras alır).
 ARG APP_BASE
+ARG APP_API_BASE
 WORKDIR /src
 # Bağımlılıklar ayrı katmanda: yalnız kaynak değişince npm ci tekrar çalışmaz.
 COPY frontend-taste/package.json frontend-taste/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend-taste/ ./
-RUN VITE_BASE=$APP_BASE npm run build
+RUN VITE_BASE=$APP_BASE VITE_API_BASE=$APP_API_BASE npm run build
 
 # --- 2) library-frontend (yönetim paneli) → /admin/ (ya da ADMIN_BASE) ---
 FROM ${NODE_IMAGE} AS admin
 ARG ADMIN_BASE
+ARG ADMIN_API_BASE
 WORKDIR /src
 COPY library-frontend/package.json library-frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY library-frontend/ ./
-RUN VITE_BASE=$ADMIN_BASE npm run build
+RUN VITE_BASE=$ADMIN_BASE VITE_API_BASE=$ADMIN_API_BASE npm run build
 
 # --- 3) çalışma zamanı: statik dosyalar + Caddy ---
 FROM ${CADDY_IMAGE}
-COPY deploy/Caddyfile /etc/caddy/Caddyfile
+ARG CADDYFILE
+COPY ${CADDYFILE} /etc/caddy/Caddyfile
 COPY --from=app   /src/dist /srv/app
 COPY --from=admin /src/dist /srv/admin
 
