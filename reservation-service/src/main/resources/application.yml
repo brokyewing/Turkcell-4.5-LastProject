@@ -1,6 +1,10 @@
 server:
   port: 8084
 
+# Servisler arasi (Feign) cagrilarin kimligi: paylasilan sir. Bos ise ic cagri KABUL EDILMEZ (fail-closed).
+internal:
+  token: ${INTERNAL_TOKEN:}
+
 spring:
   application:
     name: reservation-service

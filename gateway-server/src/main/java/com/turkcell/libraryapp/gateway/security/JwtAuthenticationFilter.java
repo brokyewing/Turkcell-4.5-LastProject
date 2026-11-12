@@ -168,6 +168,8 @@ public class JwtAuthenticationFilter implements GlobalFilter, Ordered {
     private void removeClientIdentityHeaders(HttpHeaders headers) {
         headers.remove("X-Student-Id");
         headers.remove("X-Role");
+        // Servisler arası paylaşılan sır yalnız Feign tarafında eklenir; istemci forge edemez.
+        headers.remove("X-Internal-Token");
     }
 
     /**
