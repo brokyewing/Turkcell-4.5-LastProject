@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 
-@FeignClient(name = "book-service", path = "/api/copybooks", fallbackFactory = BookServiceClientFallbackFactory.class)
+@FeignClient(name = "book-service", path = "/api/copybooks", fallbackFactory = BookServiceClientFallbackFactory.class, configuration = InternalAuthFeignConfig.class)
 public interface BookServiceClient {
 
     @GetMapping("/{id}/exists")

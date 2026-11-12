@@ -116,6 +116,10 @@ services:
       args:
         SERVICE: member-service
         JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      # Servisler arasi (Feign) kimligi. Uretimde MUTLAKA verilmeli: bos birakilirsa
+      # compose baslamaz, cunku guard token yoksa ic cagriyi reddeder (fail-closed).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN zorunlu (guclu rastgele deger uret)}
 
   loan-service:
     container_name: !reset
@@ -127,6 +131,9 @@ services:
       args:
         SERVICE: loan-service
         JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      # Servisler arasi (Feign) kimligi — uretimde zorunlu (bos ise compose baslamaz).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN zorunlu (guclu rastgele deger uret)}
 
   reservation-service:
     container_name: !reset
@@ -138,6 +145,9 @@ services:
       args:
         SERVICE: reservation-service
         JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      # Servisler arasi (Feign) kimligi — uretimde zorunlu (bos ise compose baslamaz).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN zorunlu (guclu rastgele deger uret)}
 
   fine-service:
     container_name: !reset
@@ -149,6 +159,9 @@ services:
       args:
         SERVICE: fine-service
         JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      # Servisler arasi (Feign) kimligi — uretimde zorunlu (bos ise compose baslamaz).
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:?INTERNAL_TOKEN zorunlu (guclu rastgele deger uret)}
 
   # ---------------------------------------------------------------- giriş noktası
   # Tek origin: / (üye) + /admin/ (yönetim) + /api (gateway proxy).

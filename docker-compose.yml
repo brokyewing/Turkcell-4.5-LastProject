@@ -156,6 +156,8 @@ services:
       # Demo kutuphaneci seed'i icin parola. Bos birakilirsa kutuphaneci HIC seed edilmez.
       - DEMO_LIBRARIAN_PASSWORD=${DEMO_LIBRARIAN_PASSWORD:-}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      # Servisler arasi (Feign) kimligi; guard bu olmadan ic cagriyi reddeder.
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health || exit 1"]
       interval: 15s
@@ -185,6 +187,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      # Servisler arasi (Feign) kimligi; guard bu olmadan ic cagriyi reddeder.
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health || exit 1"]
       interval: 15s
@@ -211,6 +215,8 @@ services:
       - SPRING_DATASOURCE_USERNAME=${POSTGRES_USER}
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      # Servisler arasi (Feign) kimligi; guard bu olmadan ic cagriyi reddeder.
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8084/actuator/health || exit 1"]
       interval: 15s
@@ -240,6 +246,8 @@ services:
       - SPRING_DATASOURCE_PASSWORD=${SPRING_DATASOURCE_PASSWORD}
       - SPRING_KAFKA_BOOTSTRAP_SERVERS=kafka:9092
       - EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE=http://discovery-server:8761/eureka/
+      # Servisler arasi (Feign) kimligi; guard bu olmadan ic cagriyi reddeder.
+      - INTERNAL_TOKEN=${INTERNAL_TOKEN:-dev-internal-token}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8085/actuator/health || exit 1"]
       interval: 15s
