@@ -11,10 +11,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** C2: /api/borrow/me/{id} yalnız kendi id'sine. */
+/** C2/H3: /api/borrow/me/{id} yalnız kendi id'sine; başkasının id'si 404. */
 @WebMvcTest(BorrowController.class)
 @Import(IdentityGuard.class)
 class BorrowControllerIdentityTest {
@@ -26,12 +25,11 @@ class BorrowControllerIdentityTest {
     private LoanService loanService;
 
     @Test
-    void studentBaskasininOdenclerini403() throws Exception {
+    void studentBaskasininOdenclerini404() throws Exception {
         mockMvc.perform(get("/api/borrow/me/2")
                         .header("X-Role", "STUDENT")
                         .header("X-Student-Id", "1"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.message").value("Access denied: not your resource"));
+                .andExpect(status().isNotFound());
     }
 
     @Test

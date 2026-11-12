@@ -20,10 +20,13 @@ public class BorrowController {
     private final IdentityGuard identityGuard;
 
     @GetMapping("/me/{studentId}")
-    public List<LoanResponseDto> getMyLoans(@PathVariable Long studentId) {
-        identityGuard.requireSelf(studentId);
+    public ResponseEntity<List<LoanResponseDto>> getMyLoans(@PathVariable Long studentId) {
+        // Başkasının id'si ile kendi id'si dışarıdan ayırt edilemesin diye 404 (403 değil).
+        if (!canAccessOwner(studentId)) {
+            return ResponseEntity.notFound().build();
+        }
         List<Loan> loans = loanService.findLoansByMemberId(studentId);
-        return loans.stream()
+        List<LoanResponseDto> responses = loans.stream()
                 .map(loan -> {
                     LoanResponseDto dto = new LoanResponseDto();
                     dto.setId(loan.getId());
@@ -35,13 +38,16 @@ public class BorrowController {
                     dto.setIsReturned(loan.getIsReturned());
                     return dto;
                 })
-                .collect(java.util.stream.Collectors.toList());
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(responses);
+    }
+
+    /** İç çağrı ve LIBRARIAN her kaydı görür; STUDENT yalnız kendi kaydını. */
+    private boolean canAccessOwner(Long ownerStudentId) {
+        if (identityGuard.isInternalCall() || identityGuard.isLibrarian()) {
+            return true;
+        }
+        Long current = identityGuard.currentStudentId();
+        return current != null && current.equals(ownerStudentId);
     }
 }
-
-
-
-
-
-
-

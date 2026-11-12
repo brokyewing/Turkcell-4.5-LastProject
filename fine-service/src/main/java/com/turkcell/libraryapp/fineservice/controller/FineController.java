@@ -23,7 +23,10 @@ public class FineController {
             @RequestParam(required = false) Long studentId,
             @RequestParam(required = false) Boolean isPaid) {
         if (studentId != null) {
-            identityGuard.requireSelf(studentId);
+            // Sahiplik ihlali 403 değil 404: başkasının cezası "yok" gibi görünür (varlık oracle'ı kapalı).
+            if (!canAccessOwner(studentId)) {
+                return ResponseEntity.notFound().build();
+            }
         } else {
             identityGuard.requireLibrarian();
         }
@@ -45,8 +48,11 @@ public class FineController {
     @GetMapping("/{id}")
     public ResponseEntity<Fine> getFineById(@PathVariable Long id) {
         Optional<Fine> fine = fineService.getFineById(id);
-        fine.ifPresent(f -> identityGuard.requireSelf(f.getStudentId()));
-        return fine.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+        // Kayıt yoksa da başkasınınsa da aynı 404 → varlık oracle'ı yok.
+        if (fine.isEmpty() || !canAccessOwner(fine.get().getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(fine.get());
     }
 
     @PostMapping
@@ -72,7 +78,9 @@ public class FineController {
 
     @GetMapping("/students/{studentId}/total")
     public ResponseEntity<Double> getTotalUnpaidFines(@PathVariable Long studentId) {
-        identityGuard.requireSelf(studentId);
+        if (!canAccessOwner(studentId)) {
+            return ResponseEntity.notFound().build();
+        }
         Double total = fineService.getTotalUnpaidFinesByStudentId(studentId);
         return ResponseEntity.ok(total);
     }
@@ -82,6 +90,15 @@ public class FineController {
         identityGuard.requireLibrarian();
         fineService.deleteFine(id);
         return ResponseEntity.ok().build();
+    }
+
+    /** İç çağrı ve LIBRARIAN her kaydı görür; STUDENT yalnız kendi kaydını. */
+    private boolean canAccessOwner(Long ownerStudentId) {
+        if (identityGuard.isInternalCall() || identityGuard.isLibrarian()) {
+            return true;
+        }
+        Long current = identityGuard.currentStudentId();
+        return current != null && current.equals(ownerStudentId);
     }
 }
 

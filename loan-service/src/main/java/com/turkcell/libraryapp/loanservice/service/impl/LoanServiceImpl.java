@@ -19,6 +19,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -42,6 +43,11 @@ public class LoanServiceImpl implements LoanService {
     public Loan getLoanById(Long id) {
         return loanRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Loan not found with id: " + id));
+    }
+
+    @Override
+    public Optional<Loan> findLoanById(Long id) {
+        return loanRepository.findById(id);
     }
 
     @Override
