@@ -2,14 +2,21 @@ package com.turkcell.libraryapp.memberservice.dto;
 
 import com.turkcell.libraryapp.memberservice.enums.MembershipLevel;
 import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.Size;
 
 // PUT /api/students/{id} girdisi. Tüm alanlar opsiyonel (kısmi güncelleme).
 // password / role / id / studentNumber BİLEREK yok: bu uçtan parola ya da yetki yükseltilemez.
+// @Size(min = 1): null (gönderilmedi) geçerli, ama boş string reddedilir — aksi halde
+// {"email":""} DB'ye boş yazılıp sonraki istekte 500'e düşüyordu.
 public class StudentUpdateRequest {
+    @Size(min = 1, message = "name must not be empty")
     private String name;
+
+    @Size(min = 1, message = "lastname must not be empty")
     private String lastname;
 
     @Email(message = "email must be a valid email address")
+    @Size(min = 1, message = "email must not be empty")
     private String email;
 
     private String phone;

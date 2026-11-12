@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -91,6 +92,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ExceptionDetails> handleNoHandlerFound(NoHandlerFoundException e) {
         ExceptionDetails details = new ExceptionDetails(
                 "No handler found for " + e.getHttpMethod() + " " + e.getRequestURL());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(details);
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ExceptionDetails> handleNoResourceFound(NoResourceFoundException e) {
+        // Spring Boot 3.2+ eşleşmeyen yol için bunu fırlatır. Gövdeye e.getMessage() KOYMA:
+        // "No static resource api/..." iç yolu istemciye sızıyor.
+        log.warn("No static resource for {}: {}", e.getClass().getSimpleName(), e.getResourcePath());
+        ExceptionDetails details = new ExceptionDetails("No such endpoint");
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(details);
     }
 
