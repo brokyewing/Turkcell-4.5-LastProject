@@ -1,0 +1,119 @@
+# Caddy — tek giriş noktası, tek origin.
+#
+#   /          → frontend-taste (üye + kütüphaneci yüzeyi)   /srv/app
+#   /admin/*   → library-frontend (yönetim paneli)           /srv/admin
+#   /api*      → gateway-server:8080
+#
+# Neden tek origin: iki frontend de API'yi GÖRELİ `/api` ile çağırıyor
+# (frontend-taste/src/api.js:34, library-frontend/src/api.js:51). Aynı origin'de
+# proxy'lenince tarayıcı CORS kontrolü yapmaz → preflight yok, CORS yapılandırması
+# yok, tek TLS sertifikası yeter.
+#
+# Yönetim paneli build sırasında VITE_BASE=/admin/ ile derlenir
+# (deploy/Dockerfile.web) → varlık yolları /admin/assets/... olur.
+#
+# Domain:
+#   DOMAIN=app.example.com  → otomatik HTTPS (Let's Encrypt), konteynerde 80/443
+#   DOMAIN=http://:80       → düz HTTP (yerel deneme); host portu WEB_HTTP_PORT ile
+#                             eşlenir (ör. 8088:80), Host başlığı ne olursa olsun çalışır
+
+{
+	# Yönetim API'sini yalnız loopback'e bağla: healthcheck bunu kullanır, dışarıdan
+	# erişilemez. (127.0.0.1 şart — konteynerde "localhost" yalnız ::1'e çözülüyor.)
+	admin 127.0.0.1:2019
+}
+
+{$DOMAIN:http://:80} {
+	encode zstd gzip
+
+	# --- API: aynı origin'de gateway'e proxy ---
+	# DİKKAT: `/api` (eğik çizgisiz) de eşlenir; `handle /api/*` olsaydı `/api`
+	# isteği SPA'ya düşüp HTML dönerdi (API yazım hatası sessizce yutulurdu).
+	@api path /api /api/*
+	handle @api {
+		reverse_proxy gateway-server:8080 {
+			transport http {
+				# Gateway henüz sağlıklı değilken 502 yerine kısa süre bekle.
+				dial_timeout 5s
+			}
+		}
+	}
+
+	# --- Statik varlıklar (hash'li): SPA fallback YOK ---
+	# Ayrı handle olarak, SPA bloğundan ÖNCE durur. İç içe yazılırsa Caddy'nin
+	# `try_files` rewrite'ı önce çalışıp isteği /index.html'e çeviriyordu →
+	# olmayan asset 200 + HTML dönüyordu (ölçüldü). Dosya yoksa artık 404.
+	handle /assets/* {
+		root * /srv/app
+		@static {
+			path /assets/*
+			file {
+				try_files {path}
+			}
+		}
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# Yönetim paneli varlıkları: /admin/assets/x.js → /srv/admin/assets/x.js
+	# (strip_prefix KULLANILMAZ: matcher orijinal yolu görür, koşul tutmaz.)
+	handle /admin/assets/* {
+		root * /srv
+		@static {
+			path /admin/assets/*
+			file {
+				try_files {path}
+			}
+		}
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# --- Yönetim paneli (/admin/ öneki build'de gömülü) ---
+	handle_path /admin/* {
+		root * /srv/admin
+
+		# index.html asla önbelleklenmez: yeni sürüm hemen görünsün.
+		# `/admin/` isteğinde önek kırpıldığı için yol "/" olur — ikisi de eşlenmeli.
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+
+	# /admin (eğik çizgisiz) → /admin/
+	redir /admin /admin/ 308
+
+	# --- Ana uygulama ---
+	handle {
+		root * /srv/app
+
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
+	}
+
+	# --- Güvenlik başlıkları ---
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
+		# SPA yalnız kendi origin'inden API ve font çeker; başka kaynak yok.
+		# style-src 'unsafe-inline' → React inline style öznitelikleri için gerekli.
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	# HSTS yalnız HTTPS'te: yerel HTTP denemesinde tarayıcıyı kilitlemesin.
+	@tls expression {scheme} == "https"
+	header @tls Strict-Transport-Security "max-age=31536000; includeSubDomains"
+
+	log {
+		output stdout
+		format console
+	}
+}

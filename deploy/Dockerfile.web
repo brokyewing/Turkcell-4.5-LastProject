@@ -1,0 +1,42 @@
+# İki React/Vite ön yüzünü derler ve tek bir Caddy konteynerinde sunar.
+#
+# Kritik nokta: iki frontend de API'yi GÖRELİ `/api` yoluyla çağırıyor
+# (frontend-taste/src/api.js:34, library-frontend/src/api.js:51).
+# Caddy `/api/*` isteklerini gateway'e proxy'ler → tarayıcı açısından AYNI ORIGIN.
+# Üretimde CORS hiç tetiklenmez.
+#
+# Yönetim paneli `/admin/` altında yaşar → VITE_BASE=/admin/ ile derlenir.
+# Yerel geliştirmede VITE_BASE yok → base '/' (http://localhost:5173/), değişmez.
+#
+# Bağlam: depo kökü (docker-compose.prod.yml `build.context: .`)
+
+ARG NODE_IMAGE=node:22-alpine
+ARG CADDY_IMAGE=caddy:2-alpine
+
+# --- 1) frontend-taste (üye + kütüphaneci yüzeyi) → / ---
+FROM ${NODE_IMAGE} AS app
+WORKDIR /src
+# Bağımlılıklar ayrı katmanda: yalnız kaynak değişince npm ci tekrar çalışmaz.
+COPY frontend-taste/package.json frontend-taste/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY frontend-taste/ ./
+RUN npm run build
+
+# --- 2) library-frontend (yönetim paneli) → /admin/ ---
+FROM ${NODE_IMAGE} AS admin
+WORKDIR /src
+COPY library-frontend/package.json library-frontend/package-lock.json ./
+RUN npm ci --no-audit --no-fund
+COPY library-frontend/ ./
+RUN VITE_BASE=/admin/ npm run build
+
+# --- 3) çalışma zamanı: statik dosyalar + Caddy ---
+FROM ${CADDY_IMAGE}
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+COPY --from=app   /src/dist /srv/app
+COPY --from=admin /src/dist /srv/admin
+
+# Caddy otomatik TLS verisi (sertifikalar) kalıcı volume'a bağlanır.
+VOLUME ["/data"]
+
+EXPOSE 80 443 443/udp

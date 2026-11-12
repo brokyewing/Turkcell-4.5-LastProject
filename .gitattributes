@@ -1,0 +1,6 @@
+# Satır sonları: konteyner/derleme dosyaları LF olmalı.
+# core.autocrlf=true olan Windows kurulumunda bu dosyalar CRLF'e çevrilirse
+# Dockerfile satır devamları ve shell betikleri bozulabilir.
+Dockerfile* text eol=lf
+deploy/Caddyfile text eol=lf
+*.sh text eol=lf

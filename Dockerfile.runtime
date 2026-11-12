@@ -1,0 +1,44 @@
+# Üretim için paylaşılan çalışma zamanı imajı.
+#
+# Neden ayrı: servislerin kendi Dockerfile'ları imaj içinde Maven ile derliyor.
+# ARM sunucuda (Oracle Ampere A1, 2 OCPU) 8 modülü orada derlemek 20-30 dakika sürer
+# ve RAM yer. Burada JAR'lar geliştirici makinesinde (x86) üretilir; JAR mimariden
+# bağımsızdır, bu imaj yalnızca çalıştırır.
+#
+# Kullanım (docker-compose.prod.yml üzerinden):
+#   docker build -f Dockerfile.runtime \
+#     --build-arg SERVICE=book-service \
+#     --build-arg JRE_IMAGE=eclipse-temurin:21-jre \
+#     -t kitaplik/book-service .
+#
+# Ön koşul: ilgili servis için `mvn -B -DskipTests package` çalıştırılmış olmalı
+# (target/*.jar mevcut).
+
+ARG JRE_IMAGE=eclipse-temurin:21-jre
+FROM ${JRE_IMAGE}
+
+# Heap, konteyner bellek limitine GÖRE hesaplanır (mem_limit × %50).
+# Ölçüm: boşta 2,85 GB / yük altında tepe 3,0 GB (11 konteyner, 240 istek).
+# Limitlerin toplamı ~7,3 GB → 12 GB'lık sunucuda ~4,7 GB boşluk kalır.
+# MaxMetaspaceSize sınırlanır ki metaspace sızıntısı konteyneri OOMKilled yapmasın,
+# onun yerine anlaşılır OutOfMemoryError üretsin.
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=50 -XX:MaxMetaspaceSize=192m -XX:+ExitOnOutOfMemoryError -XX:+UseContainerSupport -Djava.security.egd=file:/dev/./urandom"
+
+# JVM sinyalleri doğru alsın (compose stop → SIGTERM → düzgün kapanış).
+STOPSIGNAL SIGTERM
+
+WORKDIR /app
+
+# Hangi servisin JAR'ı kopyalanacak. Wildcard, Spring Boot repackage çıktısını
+# (tek *.jar; *.jar.original eşleşmez) yakalar.
+ARG SERVICE
+COPY ${SERVICE}/target/*.jar /app/app.jar
+
+# Çalışma kullanıcısı: root değil. temurin imajında hazır 'nobody' var.
+USER nobody:nogroup
+
+# Servis portları farklı (8080-8085, 8761, 8888) ama hepsi konteyner içinde dinler;
+# dışarıya yalnızca reverse proxy üzerinden çıkılır. Belge amaçlı.
+EXPOSE 8080
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

@@ -1,0 +1,195 @@
+# Üretim katmanı — geliştirme tanımının (docker-compose.yml) ÜZERİNE biner.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.prod up -d --build
+#
+# Bu dosyanın çözdüğü dört şey:
+#   1. BELLEK: her servise mem_limit + JVM MaxRAMPercentage=50 → 12 GB'lık sunucuda
+#      limitlerin toplamı ~7,4 GB. Ölçüm: boşta 2,85 GB, yük altında tepe 3,0 GB.
+#      Limit olmadan JVM'ler konteynerin %25'ini heap sanıp toplamda şişer → OOM.
+#      Not: limit, heap + metaspace + code cache + thread stack'lerden BÜYÜK olmalı.
+#      448m yetersizdi (heap 224 + metaspace 192 = 416/448) → çekirdek 512m.
+#   2. DAYANIKLILIK: restart: unless-stopped — sunucu yeniden başlarsa yığın kalkar.
+#   3. ARM UYUMLU DERLEME: imaj içinde Maven YOK. JAR'lar x86'da üretilir, burada
+#      yalnızca çalıştırılır (Dockerfile.runtime).
+#   4. DIŞA AÇILMA: altyapı ve servis portları KAPATILIR; tek giriş noktası Caddy
+#      (80/443). Caddy statik SPA'ları sunar ve /api'yi gateway'e proxy'ler →
+#      tarayıcı için aynı origin, üretimde CORS gerekmez.
+#
+# Ön koşul (JAR'lar):
+#   mvn -B -DskipTests package        # 8 modülde ayrı ayrı
+#   ls */target/*.jar                 # her servis için tek jar
+
+services:
+  # ---------------------------------------------------------------- altyapı
+  postgres:
+    container_name: !reset
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: &log
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  redis:
+    container_name: !reset
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *log
+    # Redis cache; kalıcılık gerekmiyor. Bellek dolarsa en eski anahtarı at.
+    command: ["redis-server", "--save", "", "--appendonly", "no", "--maxmemory", "96mb", "--maxmemory-policy", "allkeys-lru"]
+
+  kafka:
+    container_name: !reset
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 1024m
+    logging: *log
+    environment:
+      # Varsayılan heap 1 GB → 1024m limitin içinde sığmaz. Açıkça küçült.
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx512m"
+
+  # ---------------------------------------------------------------- çekirdek
+  discovery-server:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *log
+    build: &jar
+      context: .
+      dockerfile: Dockerfile.runtime
+      args:
+        SERVICE: discovery-server
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  config-server:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 512m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: config-server
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  gateway-server:
+    container_name: !reset
+    # Gateway dışarıya AÇILMAZ; yalnızca Caddy üzerinden erişilir.
+    ports: !reset []
+    restart: unless-stopped
+    mem_limit: 704m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: gateway-server
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+    environment:
+      EUREKA_CLIENT_SERVICE_URL_DEFAULTZONE: http://discovery-server:8761/eureka/
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET zorunlu (en az 32 karakter)}
+      # Aynı origin proxy kullanıldığı için normalde gerekmez; doğrudan erişim
+      # ihtimaline karşı gerçek domain .env.prod'dan verilebilir.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8088}
+
+  # ---------------------------------------------------------------- iş servisleri
+  book-service:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: book-service
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  member-service:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: member-service
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  loan-service:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: loan-service
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  reservation-service:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: reservation-service
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  fine-service:
+    container_name: !reset
+    restart: unless-stopped
+    mem_limit: 768m
+    logging: *log
+    build:
+      <<: *jar
+      args:
+        SERVICE: fine-service
+        JRE_IMAGE: ${JRE_IMAGE:-eclipse-temurin:21-jre}
+
+  # ---------------------------------------------------------------- giriş noktası
+  # Tek origin: / (üye) + /admin/ (yönetim) + /api (gateway proxy).
+  # Altyapı ve servis portları kapatıldığı için dışarıdan tek kapı burasıdır.
+  web:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.web
+      args:
+        NODE_IMAGE: ${NODE_IMAGE:-node:22-alpine}
+        CADDY_IMAGE: ${CADDY_IMAGE:-caddy:2-alpine}
+    restart: unless-stopped
+    mem_limit: 128m
+    logging: *log
+    ports:
+      - "${WEB_HTTP_PORT:-80}:80"
+      - "${WEB_HTTPS_PORT:-443}:443"
+      - "${WEB_HTTPS_PORT:-443}:443/udp"
+    environment:
+      # Gerçek alan adı verilirse otomatik HTTPS; şema verilirse düz HTTP.
+      DOMAIN: ${DOMAIN:-http://:80}
+    volumes:
+      - caddy_data:/data
+    networks:
+      - library-network
+    read_only: true
+    tmpfs:
+      - /config
+      - /tmp
+    depends_on:
+      gateway-server:
+        condition: service_healthy
+    healthcheck:
+      # Domain'e bağımlı olmasın diye Caddy'nin yönetim API'si kontrol edilir.
+      # DİKKAT: 127.0.0.1 kullan — konteynerde "localhost" yalnız ::1'e çözülüyor
+      # ve Caddy admin arayüzü IPv4'te dinliyor (ölçüldü: localhost → rc=1).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:2019/config/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  caddy_data:

@@ -1,0 +1,33 @@
+# Build bağlamını küçült (bağlam depo kökü: 8 modül + 2 frontend).
+# Node_modules ve ara derleme çıktıları gönderilmez; JAR'lar GÖNDERİLİR
+# (Dockerfile.runtime onları kopyalar).
+#
+# DİKKAT: Docker desenleri KÖKE göre değil, tüm yola göre eşlenir ve `*` `/`
+# geçmez. Bu yüzden gizli/ortam dosyaları `**/` önekiyle yazılmalı — `*.pem`
+# yalnız kökteki dosyayı eler, `deploy/tls/privkey.pem` bağlama GİRERDİ
+# (ölçüldü: iç içe .env.production ve privkey.pem imaja sızıyordu).
+
+.git
+.gitignore
+.beyin
+.idea
+**/.idea
+**/node_modules
+**/dist
+
+# Maven çıktısının tamamı hariç, yalnız çalıştırılabilir JAR'lar dahil.
+**/target/*
+!**/target/*.jar
+
+# Secret ve yerel ortam dosyaları asla imaja girmesin (her derinlikte).
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.prod.example
+**/*.pem
+**/*.p12
+**/*.key
+
+# Kullanılmayan / ürün dışı
+design-showcase
+**/*.log
