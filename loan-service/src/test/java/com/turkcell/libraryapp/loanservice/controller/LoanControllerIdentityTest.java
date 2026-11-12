@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -32,6 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(LoanController.class)
 @Import(IdentityGuard.class)
+@TestPropertySource(properties = "internal.token=test-secret")
 class LoanControllerIdentityTest {
 
     @Autowired
@@ -94,13 +96,23 @@ class LoanControllerIdentityTest {
                 .andExpect(status().isNotFound());
     }
 
-    // Feign yolu (fine-service → loan-service) başlıksız gelir; bozulmamalı.
+    // Feign yolu (fine-service → loan-service) iç token ile gelir; bozulmamalı.
     @Test
-    void existsBasliksizCagriBozulmaz() throws Exception {
+    void existsIcTokenliCagriBozulmaz() throws Exception {
         when(loanService.existsById(100L)).thenReturn(true);
 
-        mockMvc.perform(get("/api/loans/100/exists"))
+        mockMvc.perform(get("/api/loans/100/exists")
+                        .header("X-Internal-Token", "test-secret"))
                 .andExpect(status().isOk());
+    }
+
+    // H6: /exists varlık oracle'ı STUDENT'e kapalı.
+    @Test
+    void studentExistsSoramaz403() throws Exception {
+        mockMvc.perform(get("/api/loans/100/exists")
+                        .header("X-Role", "STUDENT")
+                        .header("X-Student-Id", "1"))
+                .andExpect(status().isForbidden());
     }
 
     // --- H3 varlık oracle'ı: "başkasının" ile "yok" AYNI yanıt ---

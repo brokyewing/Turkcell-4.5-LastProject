@@ -106,8 +106,10 @@ public class LoanController {
     }
 
     // Servisler arası varlık kontrolü için: 200 + true/false döner (fine-service Feign ile çağırır).
+    // Bilgi sızdırmamak için yalnız LIBRARIAN / iç çağrı.
     @GetMapping("/{id}/exists")
     public Boolean existsById(@PathVariable Long id) {
+        identityGuard.requireLibrarian();
         return loanService.existsById(id);
     }
     

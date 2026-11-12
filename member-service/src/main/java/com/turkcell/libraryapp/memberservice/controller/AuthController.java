@@ -34,21 +34,13 @@ public class AuthController {
         return new LoginResponse(token, student.getStudentNumber(), student.getName(), role);
     }
 
-    // BCrypt eşleşmesi. Eski düz-metin parolalar için: eşleşirse ilk girişte
-    // otomatik BCrypt'e YÜKSELT (upgrade-on-login) — gerçek bir migration tekniği.
+    // Yalnız BCrypt hash'i kabul edilir. Düz metin parola yolu (upgrade-on-login) KALDIRILDI:
+    // o yol, başka bir uçtan düz metin yazılabilirse kalıcı bir giriş kapısına dönüşüyordu.
     private boolean passwordMatches(Student student, String rawPassword) {
         String stored = student.getPassword();
-        if (stored == null) return false;
-
-        if (stored.startsWith("$2")) {              // zaten BCrypt hash'i
-            return passwordEncoder.matches(rawPassword, stored);
+        if (stored == null || !stored.startsWith("$2")) {
+            return false;
         }
-        // eski düz metin
-        if (stored.equals(rawPassword)) {
-            student.setPassword(passwordEncoder.encode(rawPassword));
-            studentRepository.save(student);        // bir daha düz metin kalmasın
-            return true;
-        }
-        return false;
+        return passwordEncoder.matches(rawPassword, stored);
     }
 }
