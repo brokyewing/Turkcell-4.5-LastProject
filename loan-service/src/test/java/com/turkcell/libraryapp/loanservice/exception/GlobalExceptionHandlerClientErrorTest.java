@@ -1,9 +1,10 @@
 package com.turkcell.libraryapp.loanservice.exception;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -19,14 +20,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * H7: aynı istemci hatası handler'ları loan-service'te de derlenip çalışıyor mu? (2. modül kanıtı)
+ * H7/H8: aynı istemci hatası handler'ları loan-service'te de çalışıyor mu? (2. modül kanıtı)
+ *
+ * <p>H8: {@code @WebMvcTest} ile gerçek DispatcherServlet + ResourceHandler kullanılır.
+ * Eşleşmeyen yol üretimde olduğu gibi {@code NoResourceFoundException} fırlatır.
  */
+@WebMvcTest(controllers = ProbeController.class)
 class GlobalExceptionHandlerClientErrorTest {
 
-    private final MockMvc mockMvc = MockMvcBuilders
-            .standaloneSetup(new ProbeController())
-            .setControllerAdvice(new GlobalExceptionHandler())
-            .build();
+    @Autowired
+    private MockMvc mockMvc;
 
     @Test
     void eksikParametre400() throws Exception {
@@ -47,26 +50,37 @@ class GlobalExceptionHandlerClientErrorTest {
                 .andExpect(content().string(not(containsString("HttpMessageNotReadableException"))));
     }
 
-    @RestController
-    static class ProbeController {
-
-        @GetMapping("/api/test-probe/required-param")
-        String requiredParam(@RequestParam("value") String value) {
-            return value;
-        }
-
-        @PostMapping("/api/test-probe/body")
-        String body(@RequestBody ProbeBody body) {
-            return String.valueOf(body.getStatus());
-        }
+    // Eşleşmeyen yol: loan-service üretimde 404 dönmeli, 500 + iç yol sızmamalı.
+    @Test
+    void eslesmeyenYol404VeIcYolSizmaz() throws Exception {
+        mockMvc.perform(get("/api/test-probe/no-such-endpoint"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value("No such endpoint"))
+                .andExpect(content().string(not(containsString("No static resource"))))
+                .andExpect(content().string(not(containsString("NoResourceFound"))))
+                .andExpect(content().string(not(containsString("api/test-probe/no-such-endpoint"))));
     }
-
-    static class ProbeBody {
-        private ProbeStatus status;
-
-        public ProbeStatus getStatus() { return status; }
-        public void setStatus(ProbeStatus status) { this.status = status; }
-    }
-
-    enum ProbeStatus { ZAMANINDA, COK_GEC }
 }
+
+@RestController
+class ProbeController {
+
+    @GetMapping("/api/test-probe/required-param")
+    String requiredParam(@RequestParam("value") String value) {
+        return value;
+    }
+
+    @PostMapping("/api/test-probe/body")
+    String body(@RequestBody ProbeBody body) {
+        return String.valueOf(body.getStatus());
+    }
+}
+
+class ProbeBody {
+    private ProbeStatus status;
+
+    public ProbeStatus getStatus() { return status; }
+    public void setStatus(ProbeStatus status) { this.status = status; }
+}
+
+enum ProbeStatus { ZAMANINDA, COK_GEC }

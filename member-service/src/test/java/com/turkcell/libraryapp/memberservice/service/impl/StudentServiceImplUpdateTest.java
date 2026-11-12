@@ -78,6 +78,22 @@ class StudentServiceImplUpdateTest {
         assertThat(saved.getPassword()).isEqualTo("$2a$10$existingHashExistingHashExistingHashExistingHash");
     }
 
+    // H8: "gönderilmedi" = null membershipLevel, mevcut GOLD'u korumalı.
+    // Entity alan başlatıcısı STANDARD'dır; servisin null-guard'ı kaldırılırsa bu test kırılır.
+    @Test
+    void membershipLevelNullGOLDKorur() {
+        Student existing = existing();
+        when(studentRepository.findById(1L)).thenReturn(Optional.of(existing));
+        when(studentRepository.save(any(Student.class))).thenAnswer(i -> i.getArgument(0));
+
+        // Controller'ın DTO→entity eşlemesi gibi: gövdede alan yoksa explicit null set edilir.
+        Student patch = new Student();
+        patch.setMembershipLevel(null);
+        Student saved = service.updateStudent(1L, patch);
+
+        assertThat(saved.getMembershipLevel()).isEqualTo(MembershipLevel.GOLD);
+    }
+
     @Test
     void verilenAlanlarYazilir() {
         Student existing = existing();

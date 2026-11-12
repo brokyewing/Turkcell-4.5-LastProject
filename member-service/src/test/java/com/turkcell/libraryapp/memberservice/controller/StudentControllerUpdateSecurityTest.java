@@ -108,6 +108,10 @@ class StudentControllerUpdateSecurityTest {
         verify(studentService).updateStudent(eq(1L), captor.capture());
         assertThat(captor.getValue().getName()).isNull();
         assertThat(captor.getValue().getPhone()).isEqualTo("555");
+        // H8: membershipLevel da explicit null gitmeli; servis "null'sa koru" kuralıyla çalışır.
+        // Controller'da setMembershipLevel(request.getMembershipLevel()) satırı silinirse entity
+        // başlatıcısı STANDARD verir ve mevcut GOLD sessizce düşer — bu assert onu yakalar.
+        assertThat(captor.getValue().getMembershipLevel()).isNull();
     }
 
     // d) Geçersiz email 500 değil 400.
@@ -118,6 +122,18 @@ class StudentControllerUpdateSecurityTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"email":"not-an-email"}
+                                """))
+                .andExpect(status().isBadRequest());
+    }
+
+    // e) H8: boş email 400 — eskiden DB'ye boş yazılıp ikinci istekte 500'e düşüyordu.
+    @Test
+    void bosEmail400() throws Exception {
+        mockMvc.perform(put("/api/students/1")
+                        .header("X-Role", "LIBRARIAN")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":""}
                                 """))
                 .andExpect(status().isBadRequest());
     }
