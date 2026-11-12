@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { api, setToken, getToken, decodeToken } from './api'
+import { api, setToken, getToken } from './api'
+import { decodeToken } from './utils/jwt'
 import AdminView from './admin.jsx'
 import UserView from './user.jsx'
 
@@ -17,7 +18,7 @@ export default function App() {
 
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 
-  const me = decodeToken() || {}
+  const me = decodeToken(getToken()) || {}
   const isLibrarian = me.role === 'LIBRARIAN'
   const active = surface || (isLibrarian ? 'admin' : 'user')
   function logout() { setToken(null); setAuthed(false); setSurface(null) }

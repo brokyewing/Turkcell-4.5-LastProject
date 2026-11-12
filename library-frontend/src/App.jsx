@@ -3,7 +3,8 @@ import { DataProvider, useData } from './data'
 import { ToastProvider } from './ui'
 import { Icon } from './icons'
 import { Dashboard, BooksView, AuthorsView, CategoriesView } from './views'
-import { api, setToken, isAuthed, decodeToken } from './api'
+import { api, setToken, isAuthed, getToken } from './api'
+import { decodeToken } from './utils/jwt'
 
 const NAV = [
   { key: 'dashboard', label: 'Genel Bakış', icon: Icon.Dashboard },
@@ -99,7 +100,7 @@ export default function App() {
 
   if (!authed) return <Login onSuccess={() => setAuthed(true)} />
 
-  const me = decodeToken() || {}
+  const me = decodeToken(getToken()) || {}
   const logout = () => { setToken(null); setAuthed(false) }
 
   // Yönetim paneli yalnız kütüphaneci hesaplara açık.
