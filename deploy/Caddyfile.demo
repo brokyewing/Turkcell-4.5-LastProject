@@ -1,0 +1,57 @@
+# DEMO Caddyfile — yalnız Sayfam portföyünde /demos/kitaplik/ alt yolu için.
+# Üretimde deploy/Caddyfile kullanılır; bu dosya üretimde KULLANILMAZ.
+{
+	admin 127.0.0.1:2019
+}
+
+:80 {
+	encode zstd gzip
+
+	# 1) API: /demos/kitaplik/api/* -> gateway:8080 (önek kırpılır: /api/*)
+	@api path /demos/kitaplik/api /demos/kitaplik/api/*
+	handle @api {
+		uri strip_prefix /demos/kitaplik
+		reverse_proxy gateway-server:8080 {
+			transport http {
+				dial_timeout 5s
+			}
+		}
+	}
+
+	# 2) Yönetim paneli: /demos/kitaplik/admin/* -> /srv/admin
+	handle_path /demos/kitaplik/admin/* {
+		root * /srv/admin
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	# 3) Ana uygulama: /demos/kitaplik/* -> /srv/app
+	handle_path /demos/kitaplik/* {
+		root * /srv/app
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+		try_files {path} /index.html
+		file_server
+	}
+
+	redir /demos/kitaplik /demos/kitaplik/ 308
+
+	handle {
+		respond "Not found" 404
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

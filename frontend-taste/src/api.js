@@ -1,4 +1,8 @@
 // JWT-farkında API katmanı. Token localStorage'da tutulur, her isteğe eklenir.
+
+// API kökü: üretimde '/api' (tek origin), alt yol demosunda VITE_API_BASE ile ezilir.
+const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '')
+
 let token = localStorage.getItem('kitaplik_token') || null
 
 export function setToken(t) {
@@ -14,7 +18,7 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers })
   if (res.status === 401) {
     setToken(null)
     // Token temizlendi; App.jsx dinleyip oturumu kapatıyor (login ekranına dönüş).
