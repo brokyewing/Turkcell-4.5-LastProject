@@ -1,16 +1,30 @@
-# DEMO Caddyfile — yalnız Sayfam portföyünde /demos/kitaplik/ alt yolu için.
+# DEMO Caddyfile — yalnız portföy (Sayfam) içinde alt yol demosu için.
 # Üretimde deploy/Caddyfile kullanılır; bu dosya üretimde KULLANILMAZ.
+#
+# ÖNEMLİ — yol sözleşmesi:
+#   Sayfam'ın `/demos/kitaplik` proxy'si ÖNEKİ KIRPAR (createPrefixProxy:
+#   `/demos/kitaplik/api/x` → upstream `/api/x`, `/demos/kitaplik/` → `/`).
+#   Bu yüzden bu Caddyfile KÖK tabanlıdır — üretimdeki gibi. Tarayıcının gördüğü
+#   yollar (`/demos/kitaplik/assets/...`, `/demos/kitaplik/api/...`) build
+#   arg'larıyla (APP_BASE / APP_API_BASE) gömülür; Caddy onları hiç görmez.
+#
+#   Tarayıcı → Sayfam (stripPrefix) → bu konteyner (kök)
+#   /demos/kitaplik/            → /            → /srv/app
+#   /demos/kitaplik/assets/x.js → /assets/x.js → /srv/app/assets/x.js
+#   /demos/kitaplik/api/auth/…  → /api/auth/…  → gateway-server:8080/api/auth/…
+#   /demos/kitaplik/admin/…     → /admin/…     → /srv/admin
+
 {
+	# Yönetim API'sini yalnız loopback'e bağla (healthcheck/diagnostik).
 	admin 127.0.0.1:2019
 }
 
 :80 {
 	encode zstd gzip
 
-	# 1) API: /demos/kitaplik/api/* -> gateway:8080 (önek kırpılır: /api/*)
-	@api path /demos/kitaplik/api /demos/kitaplik/api/*
+	# --- API: gateway'e proxy (kök /api) ---
+	@api path /api /api/*
 	handle @api {
-		uri strip_prefix /demos/kitaplik
 		reverse_proxy gateway-server:8080 {
 			transport http {
 				dial_timeout 5s
@@ -18,34 +32,63 @@
 		}
 	}
 
-	# 2) Yönetim paneli: /demos/kitaplik/admin/* -> /srv/admin
-	handle_path /demos/kitaplik/admin/* {
-		root * /srv/admin
-		@html path / /index.html
-		header @html Cache-Control "no-cache"
-		try_files {path} /index.html
-		file_server
-	}
-
-	# 3) Ana uygulama: /demos/kitaplik/* -> /srv/app
-	handle_path /demos/kitaplik/* {
+	# --- Statik varlıklar (hash'li): SPA fallback YOK, dosya yoksa 404 ---
+	handle /assets/* {
 		root * /srv/app
+		@static {
+			path /assets/*
+			file {
+				try_files {path}
+			}
+		}
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	handle /admin/assets/* {
+		root * /srv
+		@static {
+			path /admin/assets/*
+			file {
+				try_files {path}
+			}
+		}
+		header @static Cache-Control "public, max-age=31536000, immutable"
+		file_server
+	}
+
+	# --- Yönetim paneli ---
+	handle_path /admin/* {
+		root * /srv/admin
+
 		@html path / /index.html
 		header @html Cache-Control "no-cache"
+
 		try_files {path} /index.html
 		file_server
 	}
 
-	redir /demos/kitaplik /demos/kitaplik/ 308
+	redir /admin /admin/ 308
 
+	# --- Ana uygulama (SPA) ---
 	handle {
-		respond "Not found" 404
+		root * /srv/app
+
+		@html path / /index.html
+		header @html Cache-Control "no-cache"
+
+		try_files {path} /index.html
+		file_server
 	}
 
+	# --- Güvenlik başlıkları ---
+	# X-Frame-Options SAMEORIGIN (üretimde DENY): portföyde aynı origin'den
+	# iframe'e gömülebilsin, dış siteler gömemesin.
 	header {
 		X-Content-Type-Options nosniff
 		X-Frame-Options SAMEORIGIN
 		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()"
 		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob:; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'"
 		-Server
 	}
