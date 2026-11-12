@@ -14,7 +14,9 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (token) headers.Authorization = `Bearer ${token}`
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  // BASE_URL her zaman '/' ile döner ('/' veya '/demos/kitaplik/');
+  // böylece alt yolda sunulduğunda istekler de o köke gider.
+  const res = await fetch(`${import.meta.env.BASE_URL}api${path}`, { ...options, headers })
   if (res.status === 401) {
     setToken(null)
     // Token temizlendi; App.jsx dinleyip oturumu kapatıyor (login ekranına dönüş).

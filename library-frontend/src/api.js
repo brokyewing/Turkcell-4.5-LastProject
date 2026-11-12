@@ -31,7 +31,9 @@ async function request(path, options = {}) {
   const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) }
   if (current) headers.Authorization = `Bearer ${current}`
 
-  const res = await fetch(`/api${path}`, { ...options, headers })
+  // BASE_URL her zaman '/' ile döner ('/admin/' veya '/demos/kitaplik/admin/');
+  // alt yolda sunulduğunda istekler de doğru köke gider.
+  const res = await fetch(`${import.meta.env.BASE_URL}api${path}`, { ...options, headers })
 
   if (res.status === 401) {
     setToken(null)

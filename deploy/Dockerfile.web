@@ -5,30 +5,38 @@
 # Caddy `/api/*` isteklerini gateway'e proxy'ler → tarayıcı açısından AYNI ORIGIN.
 # Üretimde CORS hiç tetiklenmez.
 #
-# Yönetim paneli `/admin/` altında yaşar → VITE_BASE=/admin/ ile derlenir.
+# İki base de parametre: alt yol demosu (ör. Sayfam'da /demos/kitaplik/)
+# için build arg olarak verilir:
+#   --build-arg APP_BASE=/demos/kitaplik/ --build-arg ADMIN_BASE=/demos/kitaplik/admin/
+# Varsayılanlar (/ ve /admin/) mevcut üretim davranışını birebir korur.
 # Yerel geliştirmede VITE_BASE yok → base '/' (http://localhost:5173/), değişmez.
 #
 # Bağlam: depo kökü (docker-compose.prod.yml `build.context: .`)
 
 ARG NODE_IMAGE=node:22-alpine
 ARG CADDY_IMAGE=caddy:2-alpine
+ARG APP_BASE=/
+ARG ADMIN_BASE=/admin/
 
-# --- 1) frontend-taste (üye + kütüphaneci yüzeyi) → / ---
+# --- 1) frontend-taste (üye + kütüphaneci yüzeyi) → / (ya da APP_BASE) ---
 FROM ${NODE_IMAGE} AS app
+# Global ARG'ı stage'e taşı (varsayılanı global bildirimden miras alır).
+ARG APP_BASE
 WORKDIR /src
 # Bağımlılıklar ayrı katmanda: yalnız kaynak değişince npm ci tekrar çalışmaz.
 COPY frontend-taste/package.json frontend-taste/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend-taste/ ./
-RUN npm run build
+RUN VITE_BASE=$APP_BASE npm run build
 
-# --- 2) library-frontend (yönetim paneli) → /admin/ ---
+# --- 2) library-frontend (yönetim paneli) → /admin/ (ya da ADMIN_BASE) ---
 FROM ${NODE_IMAGE} AS admin
+ARG ADMIN_BASE
 WORKDIR /src
 COPY library-frontend/package.json library-frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY library-frontend/ ./
-RUN VITE_BASE=/admin/ npm run build
+RUN VITE_BASE=$ADMIN_BASE npm run build
 
 # --- 3) çalışma zamanı: statik dosyalar + Caddy ---
 FROM ${CADDY_IMAGE}
