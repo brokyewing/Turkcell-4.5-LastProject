@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @RestController
@@ -26,7 +27,11 @@ public class LoanController {
 
     @PostMapping
     public ResponseEntity<LoanResponseDto> createLoan(@Valid @RequestBody LoanCreateRequest request) {
-        identityGuard.requireSelf(request.getStudentId());
+        // Sahiplik ihlali 403 değil 404 döner: başkasının studentId'si ile kendi id'si
+        // dışarıdan ayırt edilemesin (varlık oracle'ı kapalı).
+        if (!canAccessOwner(request.getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
         // Business validations are done in service layer via Feign clients
         Loan loan = new Loan();
         loan.setStudentId(request.getStudentId());
@@ -43,8 +48,19 @@ public class LoanController {
 
     @PostMapping("/return")
     public ResponseEntity<LoanResponseDto> returnLoan(@Valid @RequestBody LoanReturnRequest request) {
-        Loan loan = loanService.getLoanById(request.getLoanId());
-        identityGuard.requireSelf(loan.getStudentId());
+        Optional<Loan> maybeLoan = loanService.findLoanById(request.getLoanId());
+        if (maybeLoan.isEmpty()) {
+            // Yetkili (LIBRARIAN / iç çağrı) için eski 400 davranışı korunur; STUDENT için 404.
+            if (isPrivileged()) {
+                throw new BusinessException("Loan not found with id: " + request.getLoanId());
+            }
+            return ResponseEntity.notFound().build();
+        }
+        Loan loan = maybeLoan.get();
+        // "Yok" ile "başkasının" aynı yanıtı versin diye 404.
+        if (!canAccessOwner(loan.getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
         
         if (loan.getIsReturned()) {
             throw new BusinessException("Loan already returned");
@@ -62,7 +78,9 @@ public class LoanController {
     public ResponseEntity<List<LoanResponseDto>> getMemberLoans(
             @PathVariable Long memberId,
             @RequestParam(required = false) String status) {
-        identityGuard.requireSelf(memberId);
+        if (!canAccessOwner(memberId)) {
+            return ResponseEntity.notFound().build();
+        }
         
         List<Loan> loans;
         if (status != null) {
@@ -79,10 +97,12 @@ public class LoanController {
 
     @GetMapping("/{id}")
     public ResponseEntity<LoanResponseDto> getLoanById(@PathVariable Long id) {
-        Loan loan = loanService.getLoanById(id);
-        identityGuard.requireSelf(loan.getStudentId());
-        LoanResponseDto response = mapToDto(loan);
-        return ResponseEntity.ok(response);
+        Optional<Loan> maybeLoan = loanService.findLoanById(id);
+        // Kayıt yoksa da başkasınınsa da aynı 404 → varlık oracle'ı yok.
+        if (maybeLoan.isEmpty() || !canAccessOwner(maybeLoan.get().getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(mapToDto(maybeLoan.get()));
     }
 
     // Servisler arası varlık kontrolü için: 200 + true/false döner (fine-service Feign ile çağırır).
@@ -101,6 +121,19 @@ public class LoanController {
         return ResponseEntity.ok(responses);
     }
     
+    /** İç çağrı ve LIBRARIAN her kaydı görür; STUDENT yalnız kendi kaydını. */
+    private boolean canAccessOwner(Long ownerStudentId) {
+        if (isPrivileged()) {
+            return true;
+        }
+        Long current = identityGuard.currentStudentId();
+        return current != null && current.equals(ownerStudentId);
+    }
+
+    private boolean isPrivileged() {
+        return identityGuard.isInternalCall() || identityGuard.isLibrarian();
+    }
+
     private LoanResponseDto mapToDto(Loan loan) {
         LoanResponseDto dto = new LoanResponseDto();
         dto.setId(loan.getId());

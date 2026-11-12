@@ -26,7 +26,10 @@ public class ReservationController {
 
     @PostMapping
     public ResponseEntity<ReservationResponseDto> createReservation(@Valid @RequestBody ReservationCreateRequest request) {
-        identityGuard.requireSelf(request.getStudentId());
+        // Sahiplik ihlali 403 değil 404 → başkasının studentId'si kendi id'sinden ayırt edilemesin.
+        if (!canAccessOwner(request.getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
         Reservation reservation = new Reservation();
         reservation.setStudentId(request.getStudentId());
         reservation.setCopyBookId(request.getCopyBookId());
@@ -42,9 +45,19 @@ public class ReservationController {
 
     @PostMapping("/{id}/cancel")
     public ResponseEntity<ReservationResponseDto> cancelReservation(@PathVariable Long id) {
-        Reservation reservation = reservationService.getReservationById(id)
-                .orElseThrow(() -> new BusinessException("Reservation not found with id: " + id));
-        identityGuard.requireSelf(reservation.getStudentId());
+        Optional<Reservation> maybeReservation = reservationService.getReservationById(id);
+        if (maybeReservation.isEmpty()) {
+            // Yetkili (LIBRARIAN / iç çağrı) için eski 400 davranışı korunur; STUDENT için 404.
+            if (isPrivileged()) {
+                throw new BusinessException("Reservation not found with id: " + id);
+            }
+            return ResponseEntity.notFound().build();
+        }
+        Reservation reservation = maybeReservation.get();
+        // "Yok" ile "başkasının" aynı yanıtı versin diye 404.
+        if (!canAccessOwner(reservation.getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
         
         if (reservation.getStatus() != ReservationStatus.ACTIVE) {
             throw new BusinessException("Only active reservations can be cancelled");
@@ -59,9 +72,11 @@ public class ReservationController {
     @GetMapping("/{id}")
     public ResponseEntity<ReservationResponseDto> getReservationById(@PathVariable Long id) {
         Optional<Reservation> reservation = reservationService.getReservationById(id);
-        reservation.ifPresent(r -> identityGuard.requireSelf(r.getStudentId()));
-        return reservation.map(r -> ResponseEntity.ok(mapToDto(r)))
-                .orElse(ResponseEntity.notFound().build());
+        // Kayıt yoksa da başkasınınsa da aynı 404 → varlık oracle'ı yok.
+        if (reservation.isEmpty() || !canAccessOwner(reservation.get().getStudentId())) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(mapToDto(reservation.get()));
     }
     
     @GetMapping
@@ -84,6 +99,19 @@ public class ReservationController {
         return ResponseEntity.ok(responses);
     }
     
+    /** İç çağrı ve LIBRARIAN her kaydı görür; STUDENT yalnız kendi kaydını. */
+    private boolean canAccessOwner(Long ownerStudentId) {
+        if (isPrivileged()) {
+            return true;
+        }
+        Long current = identityGuard.currentStudentId();
+        return current != null && current.equals(ownerStudentId);
+    }
+
+    private boolean isPrivileged() {
+        return identityGuard.isInternalCall() || identityGuard.isLibrarian();
+    }
+
     private ReservationResponseDto mapToDto(Reservation reservation) {
         ReservationResponseDto dto = new ReservationResponseDto();
         dto.setReservationId(reservation.getId());

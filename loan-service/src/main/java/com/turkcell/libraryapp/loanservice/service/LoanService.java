@@ -3,10 +3,13 @@ package com.turkcell.libraryapp.loanservice.service;
 import com.turkcell.libraryapp.loanservice.entity.Loan;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 public interface LoanService {
     List<Loan> getAllLoans();
     Loan getLoanById(Long id);
+    /** Kayıt yoksa Optional.empty() — controller'lar 404/400 ayrımını buradan yapar. */
+    Optional<Loan> findLoanById(Long id);
     Loan createLoan(Loan loan);
     Loan updateLoan(Long id, Loan loanDetails);
     Loan returnLoan(Loan loan);
