@@ -1,12 +1,14 @@
 package com.turkcell.libraryapp.memberservice.controller;
 
 import com.turkcell.libraryapp.memberservice.entity.Student;
+import com.turkcell.libraryapp.memberservice.repository.DepartmentRepository;
 import com.turkcell.libraryapp.memberservice.security.IdentityGuard;
 import com.turkcell.libraryapp.memberservice.service.StudentService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -23,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @WebMvcTest(StudentController.class)
 @Import(IdentityGuard.class)
+@TestPropertySource(properties = "internal.token=test-secret")
 class StudentControllerIdentityTest {
 
     @Autowired
@@ -30,6 +33,9 @@ class StudentControllerIdentityTest {
 
     @MockitoBean
     private StudentService studentService;
+
+    @MockitoBean
+    private DepartmentRepository departmentRepository;
 
     @Test
     void studentBaskaOgrenciDetayi403() throws Exception {
@@ -55,12 +61,31 @@ class StudentControllerIdentityTest {
                 .andExpect(jsonPath("$.id").value(1));
     }
 
-    // Feign yolu: loan/fine/reservation başlıksız çağırır → engellenmemeli.
+    // Feign yolu: loan/fine/reservation iç token ile çağırır → engellenmemeli.
     @Test
-    void existsBasliksizCagriBozulmaz() throws Exception {
+    void existsIcTokenliCagriBozulmaz() throws Exception {
         when(studentService.getStudentById(2L)).thenReturn(Optional.of(new Student()));
 
-        mockMvc.perform(get("/api/students/2/exists"))
+        mockMvc.perform(get("/api/students/2/exists")
+                        .header("X-Internal-Token", "test-secret"))
+                .andExpect(status().isOk());
+    }
+
+    // H6: /exists varlık oracle'ı STUDENT'e kapalı.
+    @Test
+    void studentExistsSoramaz403() throws Exception {
+        mockMvc.perform(get("/api/students/2/exists")
+                        .header("X-Role", "STUDENT")
+                        .header("X-Student-Id", "1"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void librarianExistsSorabilir() throws Exception {
+        when(studentService.getStudentById(2L)).thenReturn(Optional.of(new Student()));
+
+        mockMvc.perform(get("/api/students/2/exists")
+                        .header("X-Role", "LIBRARIAN"))
                 .andExpect(status().isOk());
     }
 

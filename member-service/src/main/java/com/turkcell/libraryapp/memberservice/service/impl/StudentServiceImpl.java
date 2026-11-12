@@ -56,12 +56,24 @@ public class StudentServiceImpl implements StudentService {
     public Student updateStudent(Long id, Student studentDetails) {
         Student existing = studentRepository.findById(id)
                 .orElseThrow(() -> new BusinessException("Student not found with id: " + id));
-        existing.setName(studentDetails.getName());
-        existing.setLastname(studentDetails.getLastname());
-        existing.setEmail(studentDetails.getEmail());
-        existing.setPhone(studentDetails.getPhone());
-        existing.setPassword(studentDetails.getPassword());
-        existing.setMembershipLevel(studentDetails.getMembershipLevel());
+        // Kısmi güncelleme: yalnız gönderilen (null olmayan) alanlar yazılır — NOT NULL alanlar
+        // eksik gövdeyle silinip 500'e düşmez.
+        if (studentDetails.getName() != null) {
+            existing.setName(studentDetails.getName());
+        }
+        if (studentDetails.getLastname() != null) {
+            existing.setLastname(studentDetails.getLastname());
+        }
+        if (studentDetails.getEmail() != null) {
+            existing.setEmail(studentDetails.getEmail());
+        }
+        if (studentDetails.getPhone() != null) {
+            existing.setPhone(studentDetails.getPhone());
+        }
+        // Parola bu uçtan ASLA değişmez: studentDetails.getPassword() bilerek kullanılmıyor.
+        if (studentDetails.getMembershipLevel() != null) {
+            existing.setMembershipLevel(studentDetails.getMembershipLevel());
+        }
         if (studentDetails.getDepartment() != null) {
             existing.setDepartment(studentDetails.getDepartment());
         }
