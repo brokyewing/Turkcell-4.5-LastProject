@@ -74,9 +74,17 @@ function Toolbar({ query, setQuery, placeholder, onAdd, adding }) {
         <Icon.Search />
         <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={placeholder} aria-label="Ara" />
       </div>
-      <button className="btn primary" onClick={onAdd} aria-expanded={adding}>
-        <Icon.Plus size={18} /> {adding ? 'Kapat' : 'Ekle'}
-      </button>
+      {/* Ekle = birincil eylem; açıkken "Kapat" ikincil düğmeye döner
+          (kapatmak birincil eylem değil, ayrıca + ikonu yanıltıyordu). */}
+      {adding ? (
+        <button className="btn" onClick={onAdd} aria-expanded="true">
+          <Icon.Close size={16} /> Kapat
+        </button>
+      ) : (
+        <button className="btn primary" onClick={onAdd} aria-expanded="false">
+          <Icon.Plus size={18} /> Ekle
+        </button>
+      )}
     </>
   )
 }
